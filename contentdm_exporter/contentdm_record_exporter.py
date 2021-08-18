@@ -38,10 +38,10 @@ from lxml.builder import E
 MAIN_URL = 'https://server16694.contentdm.oclc.org/dmwebservices/index.php?q='
 
 # Collection alias
-ALIAS = "p15281coll2"
+ALIAS = ""
 
 # Local path to save file
-REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Demo/migration/p15281coll2/"
+REL_PATH = "/Users/Demo/migration/my_project/"
 
 # path to the output folder where you'll find the final xml file
 MIG_OUTPUT_FOLDER = REL_PATH + "output/"

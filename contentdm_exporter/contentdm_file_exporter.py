@@ -31,13 +31,15 @@ from defusedxml.lxml import parse
 # Settings
 FILE_URL = 'https://cdm16694.contentdm.oclc.org/utils/getfile/collection/'
 
-ALIAS = "p15281coll2"
+ALIAS = ""
 
-# The loc
-REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Demo/migration/p15281coll2/output/"
+# The local path
+REL_PATH = "/Users/Demo/migration/my_project/"
 
-# path to the output folder where  you'll find the final xml file
-MIG_INPUT_FOLDER = REL_PATH
+# Path to the folder where you'll find the input xml file(s).
+MIG_INPUT_FOLDER = REL_PATH + 'output/'
+
+# Path to the output polder where the downloaded files will be stored.
 MIG_OUTPUT_FOLDER = REL_PATH + "Download/"
 
 
