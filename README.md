@@ -6,9 +6,9 @@
 
 3. Update the parameter "REL_PATH" to specify the local path to save the output.
 
-4. Run `python contentdm_record_exporter.py` to export the records from CONTENTdm.
+4. Run `python contentdm_exporter/contentdm_record_exporter.py` to export the records from CONTENTdm.
 
-5. Run  `python contentdm_file_exporter.py` to export the files from CONTENTdm. This require the records to have been exported first.
+5. Run  `python contentdm_exporter/contentdm_file_exporter.py` to export the files from CONTENTdm. This require the records to have been exported first.
 
 
 
