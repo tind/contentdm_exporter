@@ -33,21 +33,19 @@ from defusedxml.lxml import (tostring,
 from lxml.builder import E
 
 # Settings
-
-# URL to the CONTENTdm web services API.
-# MAIN_URL = 'https://server16944.contentdm.oclc.org/dmwebservices/index.php?q='
 # You can use the following URL to find the server number: hhttps://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
-MAIN_URL = 'https://server17218.contentdm.oclc.org/dmwebservices/index.php?q='
+CDM_SERVER_NUMBER = '17218'
 
 
 # Collection alias
 # ALIAS = "p17083coll7"
-ALIAS = "p17218coll2"
+# ALIAS = "p17218coll2"
+# Aliases is not used anymore, since I first query and loop through a list of aliases.
 
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
-REL_PATH = "/home/ubuntu/migration/USI/p17218coll2/"
+REL_PATH = "/home/ubuntu/migration/USI/da/"
 
 
 # path to the output folder where you'll find the final xml file
@@ -59,7 +57,7 @@ NUM_PROGRESS_BAR_CHUNKS = 50
 #  Don't change CHUNK_SIZE unless CONTENTdm is timing out.
 CHUNK_SIZE = 100
 
-# Don't change $start_at unless from 1 you are exporting a range of records. If you
+# Don't change $start_at from 1 unless you are exporting a range of records. If you
 # want to export a range, use the number of the first record in the range.
 START_AT = 1
 
@@ -74,38 +72,29 @@ LAST_REC = 0
 EXPORT_PAGE_METADATA = True
 
 # Other variables used by the script.
-compound_file_metadata = {}  # Export page metadata in a JSON file.
+# URL to the CONTENTdm web services API.
+# MAIN_URL = 'https://server16944.contentdm.oclc.org/dmwebservices/index.php?q='
+MAIN_URL = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q='.format(CDM_SERVER_NUMBER)
 
+compound_file_metadata = {}  # Export page metadata in a JSON file.
 
 rec_num = 0  # Record counter
 
 
-# Create a query map
-# We query for as little possible info at this point since we'll be doing another query
-# on each item later.
-
-# We only want parent-level items, not pages/children. It appears that changing 'suppress'
-# to 0, as documented, has no effect anyway.
-query_map = {
-    'alias': ALIAS,
-    'searchstrings': '0',
-    'fields': 'dmcreated',
-    'sortby': 'dmcreated!dmrecord',
-    'maxrecs': CHUNK_SIZE,
-    'start': START_AT,
-    'supress': 1,
-    'docptr': 0,
-    'suggest': 0,
-    'facets': 0,
-    'format': 'json'}
-
-
 def query_contentdm(start_at,
+                    query_map,
                     current_chunk=None,
-                    num_chunks=None):
+                    num_chunks=None,):
     """
     Query CONTENTdm with the values in $query_map and return an array of records.
     """
+
+    # Create a query map
+    # We query for as little possible info at this point since we'll be doing another query
+    # on each item later.
+
+    # We only want parent-level items, not pages/children. It appears that changing 'suppress'
+    # to 0, as documented, has no effect anyway.
 
     query_url = '{main_url}dmQuery/{alias}/{searchstrings}/{fields}/{sortby}/{maxrecs}/{start_at}/{docptr}/{suggest}/{facets}/{format}'.format(
         main_url=MAIN_URL,
@@ -132,18 +121,44 @@ def query_contentdm(start_at,
     return items
 
 
-# Perform a preliminary query to determine how many records are in the current collection,
-# and to determine the number of queries required to get all the records.
-prelim_results = query_contentdm(START_AT)
+def get_list_of_collection_aliases():
+    """
+    Query CONTENTdm and return a list of collecton aliases
+    """
 
-# We add one chunk, then round down using sprintf().
-print('Total number of records in collection: ', prelim_results['pager']['total'])
-num_chunks = prelim_results['pager']['total'] / CHUNK_SIZE + 1
-num_chunks = math.floor(num_chunks)
+    # GET collections
+    query_url_collections = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q=dmGetCollectionList/json'.format(CDM_SERVER_NUMBER)
 
-# Die if there are no records.
-if not prelim_results['pager']['total']:
-    exit()
+    # Query CONTENTdm and return records; if failure, log problem.
+    try:
+        res = requests.get(query_url_collections)
+        items = res.json()
+    except:
+        items = []
+        pass
+
+    # Create a list of aliases. Remove first letter which is a slash.
+    return sorted([collection.get('alias')[1:] for collection in items])
+
+
+def get_number_of_records_in_collection(alias):
+    query_map = {
+        'alias': alias,
+        'searchstrings': '0',
+        'fields': 'dmcreated',
+        'sortby': 'dmcreated!dmrecord',
+        'maxrecs': CHUNK_SIZE,
+        'start': START_AT,
+        'supress': 1,
+        'docptr': 0,
+        'suggest': 0,
+        'facets': 0,
+        'format': 'json'}
+    # Perform a preliminary query to determine how many records are in the current collection,
+    # and to determine the number of queries required to get all the records.
+    prelim_results = query_contentdm(START_AT, query_map)
+
+    return prelim_results['pager']['total']
 
 
 def get_compound_object_info(alias, pointer, format='json'):
@@ -246,7 +261,7 @@ def add_file_level_information(elem, results_record):
         print('Compound object has no file level ID (pageptr)', tostring(elem))
 
 
-def save_output_xml_to_file(collection, processed_chunks):
+def save_output_xml_to_file(collection, alias, processed_chunks):
 
     # Create output folder if it does not exists.
     output_path = Path(MIG_OUTPUT_FOLDER)
@@ -254,154 +269,184 @@ def save_output_xml_to_file(collection, processed_chunks):
         output_path.mkdir()
 
     local_file_name = Path(output_path,
-                           '{}_structure_{:03}.xml'.format(ALIAS,
-                                                           processed_chunks))
+                           'cdexport_{}_{:03}.xml'.format(alias,
+                                                          processed_chunks))
     with open(str(local_file_name), 'wb') as xmlfile:
         xmlfile.write(tostring(collection, pretty_print=True, encoding='utf-8'))
 
 
-def run_batch(total_recs, num_chunks, start_at):
+def run_batch():
     global rec_num
     global compound_file_metadata
 
-    print("Retrieving structural file for the %s collection..." % (ALIAS,))
+    # Get the list of collection aliases
+    collection_aliases = get_list_of_collection_aliases()
 
-    processed_chunks = 1
-    while processed_chunks <= num_chunks:
-        # For each chunk, create a new collection xml object.
-        collection = E.collection()
-        print('Start at: ', start_at)
+    for alias in collection_aliases:
 
-        # Query CONTENTdm for all records in a collection for the defined chunk.
-        results = query_contentdm(start_at, processed_chunks, num_chunks)
-        if not results:
-            print("Could not connect to CONTENTdm to start retrieving chunk starting at: ",
-                  start_at)
-            exit()
-        start_at = CHUNK_SIZE * processed_chunks + 1
+        # Get the number of records in a collection and calculate the number of chunks.
+        num_records_in_collection = get_number_of_records_in_collection(alias)
 
-        # Loop through each record in the processed chunk.
-        for results_record in results['records']:
-            rec_num += 1
-            print(rec_num)
+        # We add one chunk, then round down using sprintf().
+        print('Total number of records in collection {} is: {}'.format(alias, num_records_in_collection))
+        num_chunks = num_records_in_collection / CHUNK_SIZE + 1
+        num_chunks = math.floor(num_chunks)
 
-            # Create a new xml record object.
-            record = E.record()
+         # Go to the next collection if there are no records.
+        if not num_records_in_collection:
+            continue
 
-            # Append CONTENTdm record ID to new record object.
-            cdmid = E.cdmid()
-            cdmid.text = str(results_record['pointer'])
-            record.append(cdmid)
+        print("Retrieving structural file for the %s collection..." % (alias,))
 
-            # Get bibliographic record metadata
-            bib_info = get_item_info(results_record['collection'],
-                                     str(results_record['pointer']),
-                                     format='xml')
+        processed_chunks = 1
+        while processed_chunks <= num_chunks:
+            # For each chunk, create a new collection xml object.
+            collection = E.collection()
+            print('Start at: ', START_AT)
 
-            # Append each field to the new record object.
-            bib_xml = fromstring(bib_info)
-            for field in bib_xml:
-                record.append(field)
+            query_map = {
+            'alias': alias,
+            'searchstrings': '0',
+            'fields': 'dmcreated',
+            'sortby': 'dmcreated!dmrecord',
+            'maxrecs': CHUNK_SIZE,
+            'start': START_AT,
+            'supress': 1,
+            'docptr': 0,
+            'suggest': 0,
+            'facets': 0,
+            'format': 'json'}
 
-            # Get the records compound information.
-            compound_info = get_compound_object_info(results_record['collection'],
-                                                     str(results_record['pointer']),
-                                                     'xml')
-            compound_info = process_compound_object(compound_info)
-            if compound_info:
-                compound_xml = fromstring(compound_info)
-                compound_xml.tag = 'structure'
-                # Compound objects can contain metadata for each page.
-                # Get the page metadata and store it inside the page object and as
-                # a separate file (JSON). We can consider doing this in a separate
-                # script to save some time exporting the main records.
-                if EXPORT_PAGE_METADATA:
-                    # Loop through the compound object and find each page.
-                    # # Append the page metadata to the page element.
-                    for elem in compound_xml:
-                        if elem.tag == 'page':
-                            add_file_level_information(elem, results_record)
-                        if elem.tag == 'node':
-                            for sub_elem in elem:
-                                if sub_elem.tag == 'page':
-                                    add_file_level_information(sub_elem, results_record)
-                                if sub_elem.tag == 'node':
-                                    for sub_sub_elem in sub_elem:
-                                        if sub_sub_elem.tag == 'page':
-                                            add_file_level_information(sub_sub_elem,
-                                                                       results_record)
-                # Append the compound object to the record
-                record.append(compound_xml)
+            # Query CONTENTdm for all records in a collection for the defined chunk.
+            results = query_contentdm(START_AT, query_map, processed_chunks, num_chunks)
+            if not results:
+                print("Could not connect to CONTENTdm to start retrieving chunk starting at: ",
+                    start_at)
+                continue
+            start_at = CHUNK_SIZE * processed_chunks + 1
 
-            # Append the record to the collection
-            collection.append(record)
-            if LAST_REC != 0:
-                if rec_num == LAST_REC:
-                    save_output_xml_to_file(collection, processed_chunks)
+            # Loop through each record in the processed chunk.
+            for results_record in results['records']:
+                rec_num += 1
+                print(rec_num)
 
-                    # To get out of the while loop, make
-                    # processed_chunks higher than num_chunks.
-                    processed_chunks = num_chunks + 1
-                    break
+                # Create a new xml record object.
+                record = E.record()
 
-        save_output_xml_to_file(collection, processed_chunks)
+                # Append CONTENTdm record ID to new record object.
+                cdmid = E.cdmid()
+                cdmid.text = str(results_record['pointer'])
+                record.append(cdmid)
 
-        processed_chunks += 1
+                # Get bibliographic record metadata
+                bib_info = get_item_info(results_record['collection'],
+                                        str(results_record['pointer']),
+                                        format='xml')
 
-    if EXPORT_PAGE_METADATA:
-        with open(str(Path(MIG_OUTPUT_FOLDER, 'compound_file_metadata.json')), 'w') as f:
-            f.write(json.dumps(compound_file_metadata))
+                # Append each field to the new record object.
+                bib_xml = fromstring(bib_info)
+                for field in bib_xml:
+                    record.append(field)
+
+                # Get the records compound information.
+                compound_info = get_compound_object_info(results_record['collection'],
+                                                        str(results_record['pointer']),
+                                                        'xml')
+                compound_info = process_compound_object(compound_info)
+                if compound_info:
+                    compound_xml = fromstring(compound_info)
+                    compound_xml.tag = 'structure'
+                    # Compound objects can contain metadata for each page.
+                    # Get the page metadata and store it inside the page object and as
+                    # a separate file (JSON). We can consider doing this in a separate
+                    # script to save some time exporting the main records.
+                    if EXPORT_PAGE_METADATA:
+                        # Loop through the compound object and find each page.
+                        # # Append the page metadata to the page element.
+                        for elem in compound_xml:
+                            if elem.tag == 'page':
+                                add_file_level_information(elem, results_record)
+                            if elem.tag == 'node':
+                                for sub_elem in elem:
+                                    if sub_elem.tag == 'page':
+                                        add_file_level_information(sub_elem, results_record)
+                                    if sub_elem.tag == 'node':
+                                        for sub_sub_elem in sub_elem:
+                                            if sub_sub_elem.tag == 'page':
+                                                add_file_level_information(sub_sub_elem,
+                                                                        results_record)
+                    # Append the compound object to the record
+                    record.append(compound_xml)
+
+                # Append the record to the collection
+                collection.append(record)
+                if LAST_REC != 0:
+                    if rec_num == LAST_REC:
+                        save_output_xml_to_file(collection, alias, processed_chunks)
+
+                        # To get out of the while loop, make
+                        # processed_chunks higher than num_chunks.
+                        processed_chunks = num_chunks + 1
+                        break
+
+            save_output_xml_to_file(collection, alias, processed_chunks)
+
+            processed_chunks += 1
+
+        if EXPORT_PAGE_METADATA:
+            with open(str(Path(MIG_OUTPUT_FOLDER, 'compound_file_metadata_{}.json'.format(alias))), 'w') as f:
+                f.write(json.dumps(compound_file_metadata))
 
 
-def create_list_of_records(total_recs, num_chunks, start_at):
-    all_records = []
-    global rec_num
-    global compound_file_metadata
+# def create_list_of_records(total_recs, num_chunks, start_at):
+#     all_records = []
+#     global rec_num
+#     global compound_file_metadata
 
-    print("Retrieving structural file for the %s collection..." % (ALIAS,))
+#     print("Retrieving structural file for the %s collection..." % (ALIAS,))
 
-    processed_chunks = 1
-    while processed_chunks <= num_chunks:
-        # For each chunk, create a new collection xml object.
-        print('Start at: ', start_at)
+#     processed_chunks = 1
+#     while processed_chunks <= num_chunks:
+#         # For each chunk, create a new collection xml object.
+#         print('Start at: ', start_at)
 
-        # Query CONTENTdm for all records in a collection for the defined chunk.
-        results = query_contentdm(start_at, processed_chunks, num_chunks)
-        if not results:
-            print("Could not connect to CONTENTdm to start retrieving chunk starting at: ",
-                  start_at)
-            exit()
-        start_at = CHUNK_SIZE * processed_chunks + 1
+#         # Query CONTENTdm for all records in a collection for the defined chunk.
+#         results = query_contentdm(start_at, processed_chunks, num_chunks)
+#         if not results:
+#             print("Could not connect to CONTENTdm to start retrieving chunk starting at: ",
+#                   start_at)
+#             exit()
+#         start_at = CHUNK_SIZE * processed_chunks + 1
 
-        # Loop through each record in the processed chunk.
-        for results_record in results['records']:
-            rec_num += 1
-            print(rec_num)
+#         # Loop through each record in the processed chunk.
+#         for results_record in results['records']:
+#             rec_num += 1
+#             print(rec_num)
 
-            # Create a new xml record object.
-            record = {}
+#             # Create a new xml record object.
+#             record = {}
 
-            # Append CONTENTdm record ID to new record object.
-            record['cdmid'] = str(results_record['pointer'])
+#             # Append CONTENTdm record ID to new record object.
+#             record['cdmid'] = str(results_record['pointer'])
 
-            # Get the records compound information.
-            compound_info = get_compound_object_info(results_record['collection'],
-                                                     str(results_record['pointer']),
-                                                     'json')
+#             # Get the records compound information.
+#             compound_info = get_compound_object_info(results_record['collection'],
+#                                                      str(results_record['pointer']),
+#                                                      'json')
 
-            record['pages'] = [p.get('pageptr') for p in compound_info.get('page', []) if p.get('pageptr')]
-            all_records.append(record)
+#             record['pages'] = [p.get('pageptr') for p in compound_info.get('page', []) if p.get('pageptr')]
+#             all_records.append(record)
 
-        processed_chunks += 1
+#         processed_chunks += 1
 
-    with open(str(Path(MIG_OUTPUT_FOLDER, 'all_records.json')), 'w') as f:
-        f.write(json.dumps(all_records))
+#     with open(str(Path(MIG_OUTPUT_FOLDER, 'all_records.json')), 'w') as f:
+#         f.write(json.dumps(all_records))
 
-    return all_records
+#     return all_records
 
 
 if __name__ == '__main__':
-    run_batch(prelim_results['pager']['total'], num_chunks, START_AT)
+    run_batch()
 
     # all_records = create_list_of_records(prelim_results['pager']['total'], num_chunks, START_AT)
     # print(len(all_records))
