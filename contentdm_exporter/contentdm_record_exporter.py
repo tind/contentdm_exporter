@@ -47,7 +47,7 @@ ALIAS = "p17218coll2"
 
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
-REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/USI/migration/p17218coll2/"
+REL_PATH = "/home/ubuntu/migration/USI/p17218coll2/"
 
 
 # path to the output folder where you'll find the final xml file

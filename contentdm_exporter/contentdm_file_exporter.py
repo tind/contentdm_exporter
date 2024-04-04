@@ -35,7 +35,7 @@ ALIAS = "p17218coll2"
 
 # The local path
 # REL_PATH = "/Users/Demo/migration/my_project/"
-REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/USI/migration/p17218coll2/"
+REL_PATH = "/home/ubuntu/migration/USI/p17218coll2/"
 
 # Path to the folder where you'll find the input xml file(s).
 MIG_INPUT_FOLDER = REL_PATH + 'output/'
