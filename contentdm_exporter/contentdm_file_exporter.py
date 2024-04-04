@@ -29,12 +29,13 @@ from pathlib import Path
 from defusedxml.lxml import parse
 
 # Settings
-FILE_URL = 'https://cdm16694.contentdm.oclc.org/utils/getfile/collection/'
+FILE_URL = 'https://cdm17218.contentdm.oclc.org/utils/getfile/collection/'
 
-ALIAS = ""
+ALIAS = "p17218coll2"
 
 # The local path
-REL_PATH = "/Users/Demo/migration/my_project/"
+# REL_PATH = "/Users/Demo/migration/my_project/"
+REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/USI/migration/p17218coll2/"
 
 # Path to the folder where you'll find the input xml file(s).
 MIG_INPUT_FOLDER = REL_PATH + 'output/'

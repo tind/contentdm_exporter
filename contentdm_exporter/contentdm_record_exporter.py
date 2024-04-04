@@ -35,13 +35,20 @@ from lxml.builder import E
 # Settings
 
 # URL to the CONTENTdm web services API.
-MAIN_URL = 'https://server16694.contentdm.oclc.org/dmwebservices/index.php?q='
+# MAIN_URL = 'https://server16944.contentdm.oclc.org/dmwebservices/index.php?q='
+# You can use the following URL to find the server number: hhttps://mycontentdmsite.com/digital/api/diagnostics
+# or https://mycontentdmsite.com/utils/diagnostics.
+MAIN_URL = 'https://server17218.contentdm.oclc.org/dmwebservices/index.php?q='
+
 
 # Collection alias
-ALIAS = ""
+# ALIAS = "p17083coll7"
+ALIAS = "p17218coll2"
 
 # Local path to save file
-REL_PATH = "/Users/Demo/migration/my_project/"
+# REL_PATH = "/Users/Demo/migration/my_project/"
+REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/USI/migration/p17218coll2/"
+
 
 # path to the output folder where you'll find the final xml file
 MIG_OUTPUT_FOLDER = REL_PATH + "output/"
@@ -64,7 +71,7 @@ LAST_REC = 0
 # Do we like to export the page metadata?
 # Exporting the page metadata will increase the time to do the export.
 # A second approach is to do it in a separate script to avoid slowing down the core export.
-EXPORT_PAGE_METADATA = False
+EXPORT_PAGE_METADATA = True
 
 # Other variables used by the script.
 compound_file_metadata = {}  # Export page metadata in a JSON file.
@@ -346,5 +353,55 @@ def run_batch(total_recs, num_chunks, start_at):
             f.write(json.dumps(compound_file_metadata))
 
 
+def create_list_of_records(total_recs, num_chunks, start_at):
+    all_records = []
+    global rec_num
+    global compound_file_metadata
+
+    print("Retrieving structural file for the %s collection..." % (ALIAS,))
+
+    processed_chunks = 1
+    while processed_chunks <= num_chunks:
+        # For each chunk, create a new collection xml object.
+        print('Start at: ', start_at)
+
+        # Query CONTENTdm for all records in a collection for the defined chunk.
+        results = query_contentdm(start_at, processed_chunks, num_chunks)
+        if not results:
+            print("Could not connect to CONTENTdm to start retrieving chunk starting at: ",
+                  start_at)
+            exit()
+        start_at = CHUNK_SIZE * processed_chunks + 1
+
+        # Loop through each record in the processed chunk.
+        for results_record in results['records']:
+            rec_num += 1
+            print(rec_num)
+
+            # Create a new xml record object.
+            record = {}
+
+            # Append CONTENTdm record ID to new record object.
+            record['cdmid'] = str(results_record['pointer'])
+
+            # Get the records compound information.
+            compound_info = get_compound_object_info(results_record['collection'],
+                                                     str(results_record['pointer']),
+                                                     'json')
+
+            record['pages'] = [p.get('pageptr') for p in compound_info.get('page', []) if p.get('pageptr')]
+            all_records.append(record)
+
+        processed_chunks += 1
+
+    with open(str(Path(MIG_OUTPUT_FOLDER, 'all_records.json')), 'w') as f:
+        f.write(json.dumps(all_records))
+
+    return all_records
+
+
 if __name__ == '__main__':
     run_batch(prelim_results['pager']['total'], num_chunks, START_AT)
+
+    # all_records = create_list_of_records(prelim_results['pager']['total'], num_chunks, START_AT)
+    # print(len(all_records))
