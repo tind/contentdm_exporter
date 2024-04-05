@@ -31,6 +31,7 @@ from pathlib import Path
 from defusedxml.lxml import (tostring,
                              fromstring)
 from lxml.builder import E
+import logging
 from logger import setup_logger
 
 # Settings
@@ -448,7 +449,8 @@ def run_batch():
 
 
 if __name__ == '__main__':
-    logger = setup_logger(str(Path(OUTPUT_FOLDER, 'record_export.log'), 'record_export'))
+    logger = setup_logger(str(Path(OUTPUT_FOLDER, 'record_export.log')), 'record_export')
+    logger = logging.getLogger("record_export")
     run_batch()
 
     # all_records = create_list_of_records(prelim_results['pager']['total'], num_chunks, START_AT)
