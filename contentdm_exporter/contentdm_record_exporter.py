@@ -41,9 +41,10 @@ CDM_SERVER_NUMBER = '17218'
 
 
 # Collection alias
-# ALIAS = "p17083coll7"
-# ALIAS = "p17218coll2"
-# Aliases is not used anymore, since I first query and loop through a list of aliases.
+# If set to empty, the script will export the full list of collections and loop through all of them.
+# Only set this if you plan to export a single collection.
+# Used mainly for testing purposes.
+ALIAS = "p17218coll1"
 
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
@@ -63,12 +64,16 @@ START_AT = 1
 # The last record in subset, not the entire record set. Don't change LAST_REC from 0
 # unless you are exporting a subset of records. If you want to export a range, use the
 # number of records in the subset, e.g., if you want to export 200 records, use that value.
-LAST_REC = 0
+LAST_REC = 300
 
 # Do we like to export the page metadata?
 # Exporting the page metadata will increase the time to do the export.
-# A second approach is to do it in a separate script to avoid slowing down the core export.
 EXPORT_PAGE_METADATA = True
+
+# Do we like to export the page metadata in JSON?
+# This will be in addition to exporting the page metadata in XML.
+# EXPORT_PAGE_METADATA need to be set to 'True' to be able to export page metadata at all.
+EXPORT_PAGE_METADATA_JSON = True
 
 # Other variables used by the script.
 # URL to the CONTENTdm web services API.
@@ -296,8 +301,7 @@ def get_bib_record(collection_alias, cdm_recid):
         compound_xml.tag = 'structure'
         # Compound objects can contain metadata for each page.
         # Get the page metadata and store it inside the page object and as
-        # a separate file (JSON). We can consider doing this in a separate
-        # script to save some time exporting the main records.
+        # a separate file (JSON).
         if EXPORT_PAGE_METADATA:
             # Loop through the compound object and find each page.
             # Append the page metadata to the page element.
@@ -317,10 +321,12 @@ def get_bib_record(collection_alias, cdm_recid):
                     if len(pagemetadata_xml) > 0:
                         # Append the page metadata to the page element.
                         elem.append(pagemetadata_xml)
-                    # Get the page/file_metadata in JSON and export to a separate file
-                    pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
-                    if pagemetadata_json:
-                        record_compound_file_metadata[file_level_id] = pagemetadata_json
+
+                    if EXPORT_PAGE_METADATA_JSON:
+                        # Get the page/file_metadata in JSON and export to a separate file
+                        pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
+                        if pagemetadata_json:
+                            record_compound_file_metadata[file_level_id] = pagemetadata_json
 
                 if elem.tag == 'node':
                     for sub_elem in elem:
@@ -332,10 +338,12 @@ def get_bib_record(collection_alias, cdm_recid):
                             if len(pagemetadata_xml) > 0:
                                 # Append the page metadata to the page element.
                                 elem.append(pagemetadata_xml)
-                            # Get the page/file_metadata in JSON and export to a separate file
-                            pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
-                            if pagemetadata_json:
-                                record_compound_file_metadata[file_level_id] = pagemetadata_json
+
+                            if EXPORT_PAGE_METADATA_JSON:
+                                # Get the page/file_metadata in JSON and export to a separate file
+                                pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
+                                if pagemetadata_json:
+                                    record_compound_file_metadata[file_level_id] = pagemetadata_json
                         if sub_elem.tag == 'node':
                             for sub_sub_elem in sub_elem:
                                 if sub_sub_elem.tag == 'page':
@@ -346,10 +354,12 @@ def get_bib_record(collection_alias, cdm_recid):
                                     if len(pagemetadata_xml) > 0:
                                         # Append the page metadata to the page element.
                                         elem.append(pagemetadata_xml)
-                                    # Get the page/file_metadata in JSON and export to a separate file
-                                    pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
-                                    if pagemetadata_json:
-                                        record_compound_file_metadata[file_level_id] = pagemetadata_json
+
+                                    if EXPORT_PAGE_METADATA_JSON:
+                                        # Get the page/file_metadata in JSON and export to a separate file
+                                        pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
+                                        if pagemetadata_json:
+                                            record_compound_file_metadata[file_level_id] = pagemetadata_json
         # Append the compound object to the record
         record.append(compound_xml)
 
@@ -374,11 +384,11 @@ def save_output_xml_to_file(collection, alias, processed_chunks):
 def run_batch():
     global rec_num
 
-    # Get the list of collections by their aliases.
-    # collection_aliases = get_list_of_collection_aliases()
-
-    # Currently, we are testing out with one collection.
-    collection_aliases = ['African']
+    if ALIAS:
+        collection_aliases = [ALIAS]
+    else:
+        # Get the list of collections by their aliases.
+        collection_aliases = get_list_of_collection_aliases()
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
 
@@ -444,7 +454,8 @@ def run_batch():
                 record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
 
                 # Save the compound file metadata in a separate JSON file.
-                compound_file_metadata[cdm_recid] = record_compound_file_metadata
+                if record_compound_file_metadata:
+                    compound_file_metadata[cdm_recid] = record_compound_file_metadata
 
                 # Append the record to the collection
                 collection.append(record)
@@ -461,7 +472,7 @@ def run_batch():
 
             processed_chunks += 1
 
-        if EXPORT_PAGE_METADATA:
+        if EXPORT_PAGE_METADATA_JSON:
             with open(str(Path(OUTPUT_FOLDER, 'compound_file_metadata_{}.json'.format(alias))), 'w') as f:
                 f.write(json.dumps(compound_file_metadata))
 
@@ -513,6 +524,10 @@ def run_batch():
 
 
 if __name__ == '__main__':
+    # Create output folder if it does not exists.
+    output_path = Path(OUTPUT_FOLDER)
+    if not output_path.is_dir():
+        output_path.mkdir()
     logger = setup_logger(str(Path(OUTPUT_FOLDER, 'record_export.log')), 'record_export')
     logger = logging.getLogger("record_export")
     run_batch()
