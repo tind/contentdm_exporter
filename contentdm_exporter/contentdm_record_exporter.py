@@ -214,45 +214,146 @@ def get_item_info(alias, item_number, format='xml'):
     return item
 
 
-def add_file_level_information(elem, results_record):
-    file_metadata = {}
+def get_file_level_id(elem):
     file_level_id = None
     for page_elem in elem:
         if page_elem.tag == 'pageptr':
             file_level_id = page_elem.text
 
-    if file_level_id:
-        # Add file metadata inside the compound object.
-        # Use pageptr (file_level_id) as the key.
-        file_level_info = get_item_info(results_record['collection'],
-                                        file_level_id,
-                                        format='xml')
-        file_level_xml = fromstring(file_level_info)
-        # Strip away fields if no text or no child elements.
-        pagemetadata = E.pagemetadata()
-        for field in file_level_xml:
-            if field.text or len(field) > 0:
-                pagemetadata.append(field)
-        if len(pagemetadata) > 0:
-            # Append the page metadata to the page element.
-            elem.append(pagemetadata)
-
-        # Add the file metadata to a separate file (JSON).
-        file_level_info_json = get_item_info(results_record['collection'],
-                                             file_level_id,
-                                             format='json')
-        # Strip away empty values
-        updated_file_level_info = {}
-        for key, val in file_level_info_json.items():
-            if val:
-                updated_file_level_info[key] = val
-        if updated_file_level_info:
-            file_metadata[file_level_id] = updated_file_level_info
-
-    else:
+    if file_level_id is None:
         logger.warning("Compound object has no file level ID (pageptr): %s" % (tostring(elem),))
 
+    return file_level_id
+
+def get_file_metadata_xml(file_level_id, collection_alias):
+    pagemetadata = E.pagemetadata()
+    if file_level_id is None:
+        return pagemetadata
+
+    # Add file metadata inside the compound object.
+    # Use file_level_id (pageptr)) as the key.
+    file_level_info = get_item_info(collection_alias,
+                                    file_level_id,
+                                    format='xml')
+    file_level_xml = fromstring(file_level_info)
+    # Strip away empty fields.
+    pagemetadata = E.pagemetadata()
+    for field in file_level_xml:
+        if field.text or len(field) > 0:
+            pagemetadata.append(field)
+
+    return pagemetadata
+
+
+def get_file_metadata_json(file_level_id, collection_alias):
+    file_metadata = {}
+    if file_level_id is None:
+        return file_metadata
+
+    # Add the file metadata to a separate file (JSON).
+    file_level_info_json = get_item_info(collection_alias,
+                                         file_level_id,
+                                         format='json')
+    # Strip away empty values
+    for key, val in file_level_info_json.items():
+        if val:
+            file_metadata[key] = val
+
     return file_metadata
+
+
+def get_bib_record(collection_alias, cdm_recid):
+    # Create a new xml record object.
+    record = E.record()
+
+    record_compound_file_metadata = {}
+
+    # Append CONTENTdm record ID to new record object.
+    cdmid = E.cdmid(cdm_recid)
+    record.append(cdmid)
+
+    # Append the contentDM collection_alias to the new record object.
+    cdmalias = E.cdmalias(collection_alias)
+    record.append(cdmalias)
+
+    # Get bibliographic record metadata
+    bib_info = get_item_info(collection_alias,
+                             cdm_recid,
+                             format='xml')
+
+    # Append each field to the new record object.
+    bib_xml = fromstring(bib_info)
+    for field in bib_xml:
+        record.append(field)
+
+    # Get the records compound information.
+    compound_info = get_compound_object_info(collection_alias,
+                                             cdm_recid,
+                                             'xml')
+    compound_info = process_compound_object(compound_info)
+    if compound_info:
+        compound_xml = fromstring(compound_info)
+        compound_xml.tag = 'structure'
+        # Compound objects can contain metadata for each page.
+        # Get the page metadata and store it inside the page object and as
+        # a separate file (JSON). We can consider doing this in a separate
+        # script to save some time exporting the main records.
+        if EXPORT_PAGE_METADATA:
+            # Loop through the compound object and find each page.
+            # Append the page metadata to the page element.
+            # A page can be found on three levels in the XML object.
+            # - page
+            # - node
+            #   - page
+            # - node
+            #   - node
+            #     - page
+            for elem in compound_xml:
+                if elem.tag == 'page':
+                    # Get the file level id
+                    file_level_id = get_file_level_id(elem)
+                    # Get the page/file metadata
+                    pagemetadata_xml = get_file_metadata_xml(file_level_id, collection_alias)
+                    if len(pagemetadata_xml) > 0:
+                        # Append the page metadata to the page element.
+                        elem.append(pagemetadata_xml)
+                    # Get the page/file_metadata in JSON and export to a separate file
+                    pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
+                    if pagemetadata_json:
+                        record_compound_file_metadata[file_level_id] = pagemetadata_json
+
+                if elem.tag == 'node':
+                    for sub_elem in elem:
+                        if sub_elem.tag == 'page':
+                            # Get the file level id
+                            file_level_id = get_file_level_id(sub_elem)
+                            # Get the page/file metadata
+                            pagemetadata_xml = get_file_metadata_xml(file_level_id, collection_alias)
+                            if len(pagemetadata_xml) > 0:
+                                # Append the page metadata to the page element.
+                                elem.append(pagemetadata_xml)
+                            # Get the page/file_metadata in JSON and export to a separate file
+                            pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
+                            if pagemetadata_json:
+                                record_compound_file_metadata[file_level_id] = pagemetadata_json
+                        if sub_elem.tag == 'node':
+                            for sub_sub_elem in sub_elem:
+                                if sub_sub_elem.tag == 'page':
+                                    # Get the file level id
+                                    file_level_id = get_file_level_id(sub_sub_elem)
+                                    # Get the page/file metadata
+                                    pagemetadata_xml = get_file_metadata_xml(file_level_id, collection_alias)
+                                    if len(pagemetadata_xml) > 0:
+                                        # Append the page metadata to the page element.
+                                        elem.append(pagemetadata_xml)
+                                    # Get the page/file_metadata in JSON and export to a separate file
+                                    pagemetadata_json = get_file_metadata_json(file_level_id, collection_alias)
+                                    if pagemetadata_json:
+                                        record_compound_file_metadata[file_level_id] = pagemetadata_json
+        # Append the compound object to the record
+        record.append(compound_xml)
+
+    return record, record_compound_file_metadata
 
 
 def save_output_xml_to_file(collection, alias, processed_chunks):
@@ -269,11 +370,17 @@ def save_output_xml_to_file(collection, alias, processed_chunks):
         xmlfile.write(tostring(collection, pretty_print=True, encoding='utf-8'))
 
 
+
 def run_batch():
     global rec_num
 
     # Get the list of collections by their aliases.
-    collection_aliases = get_list_of_collection_aliases()
+    # collection_aliases = get_list_of_collection_aliases()
+
+    # Currently, we are testing out with one collection.
+    collection_aliases = ['African']
+
+    logger.info("The following collections were found: %s" % (collection_aliases,))
 
     for alias in collection_aliases:
 
@@ -283,15 +390,15 @@ def run_batch():
         # Get the number of records in a collection and calculate the number of chunks.
         nb_records_in_collection = get_number_of_records_in_collection(alias, start_at)
 
-        # We add one chunk, then round down using sprintf().
-        print('Total number of records in collection {} is: {}'.format(alias, nb_records_in_collection))
-        logger.info("Total number of records in collection: %s is ‰s" % (alias, nb_records_in_collection))
-        num_chunks = nb_records_in_collection / CHUNK_SIZE + 1
-        num_chunks = math.floor(num_chunks)
+        logger.info("Total number of records in collection: %s is %s" % (alias, nb_records_in_collection))
 
-         # Go to the next collection if there are no records.
+        # Go to the next collection if there are no records.
         if not nb_records_in_collection:
             continue
+
+        # We add one chunk, then round down.
+        num_chunks = nb_records_in_collection / CHUNK_SIZE + 1
+        num_chunks = math.floor(num_chunks)
 
         compound_file_metadata = {}  # Export page metadata in a JSON file.
 
@@ -319,8 +426,6 @@ def run_batch():
             # Query CONTENTdm for all records in a collection for the defined chunk.
             results = query_contentdm(query_map)
             if not results:
-                print("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: ",
-                    start_at)
                 logger.warning("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s" % (start_at,))
                 continue
 
@@ -332,55 +437,14 @@ def run_batch():
                 rec_num += 1
                 print(rec_num)
 
-                # Create a new xml record object.
-                record = E.record()
+                collection_alias = results_record['collection']
+                cdm_recid = str(results_record['pointer'])
 
-                # Append CONTENTdm record ID to new record object.
-                cdmid = E.cdmid()
-                cdmid.text = str(results_record['pointer'])
-                record.append(cdmid)
+                # Create the bib record with the contentDM record structure.
+                record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
 
-                # Get bibliographic record metadata
-                bib_info = get_item_info(results_record['collection'],
-                                         str(results_record['pointer']),
-                                         format='xml')
-
-                # Append each field to the new record object.
-                bib_xml = fromstring(bib_info)
-                for field in bib_xml:
-                    record.append(field)
-
-                # Get the records compound information.
-                compound_info = get_compound_object_info(results_record['collection'],
-                                                        str(results_record['pointer']),
-                                                        'xml')
-                compound_info = process_compound_object(compound_info)
-                if compound_info:
-                    compound_xml = fromstring(compound_info)
-                    compound_xml.tag = 'structure'
-                    # Compound objects can contain metadata for each page.
-                    # Get the page metadata and store it inside the page object and as
-                    # a separate file (JSON). We can consider doing this in a separate
-                    # script to save some time exporting the main records.
-                    if EXPORT_PAGE_METADATA:
-                        # Loop through the compound object and find each page.
-                        # # Append the page metadata to the page element.
-                        for elem in compound_xml:
-                            if elem.tag == 'page':
-                                compound_file_metadata.update
-                                (add_file_level_information(elem, results_record))
-                            if elem.tag == 'node':
-                                for sub_elem in elem:
-                                    if sub_elem.tag == 'page':
-                                        compound_file_metadata.update(
-                                            add_file_level_information(sub_elem, results_record))
-                                    if sub_elem.tag == 'node':
-                                        for sub_sub_elem in sub_elem:
-                                            if sub_sub_elem.tag == 'page':
-                                                compound_file_metadata.update(
-                                                    add_file_level_information(sub_sub_elem, results_record))
-                    # Append the compound object to the record
-                    record.append(compound_xml)
+                # Save the compound file metadata in a separate JSON file.
+                compound_file_metadata[cdm_recid] = record_compound_file_metadata
 
                 # Append the record to the collection
                 collection.append(record)
