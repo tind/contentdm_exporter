@@ -35,24 +35,40 @@ import logging
 from logger import setup_logger
 
 # Settings
-# You can use the following URL to find the server number: hhttps://mycontentdmsite.com/digital/api/diagnostics
+# You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
 CDM_SERVER_NUMBER = '17218'
-
-
-# Collection alias
-# If set to empty, the script will export the full list of collections and loop through all of them.
-# Only set this if you plan to export a single collection.
-# Used mainly for testing purposes.
-ALIAS = "p17218coll1"
+# CDM_SERVER_NUMBER = '15999'
 
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
 REL_PATH = "/home/ubuntu/migration/USI/da/"
+# REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Sales/BYU/"
 
+# Collection alias
+# If set to empty, the script will get the full list of collections and loop through all of them.
+# Only set this variable if you plan to export a single collection.
+# Used mainly for testing purposes.
+# ALIAS = "p17218coll3"
+ALIAS = ""
 
-# path to the output folder where you'll find the final xml file
-OUTPUT_FOLDER = REL_PATH + "output/"
+# Use the config below if you want to export particular records for different collections.
+# The format is a list of tuples with collection name and record IDs.
+# Example: [('p15999coll1', '8'), ('yellowstone', '2')]
+# To use this method, comment out the function run_batch()
+# and uncomment the function run_export_list_of_records().
+MANUAL_EXPORT_LIST = [
+    ('p15999coll3', '8'),
+    ('yellowstone', '5845'),
+    ('BYUPhotos', '687'),
+    ('GEA', '8131'),
+    ('Jackson', '3422'),
+    ('MStar', '6590'),
+    ('p15999coll20', '37296'),
+    ('p15999coll22', '6664'),
+    ('p15999coll24', '9632'),
+    ('WomansExp', '2399')
+]
 
 #  Don't change CHUNK_SIZE unless CONTENTdm is timing out.
 CHUNK_SIZE = 100
@@ -64,23 +80,45 @@ START_AT = 1
 # The last record in subset, not the entire record set. Don't change LAST_REC from 0
 # unless you are exporting a subset of records. If you want to export a range, use the
 # number of records in the subset, e.g., if you want to export 200 records, use that value.
-LAST_REC = 300
+LAST_REC = 0
 
 # Do we like to export the page metadata?
 # Exporting the page metadata will increase the time to do the export.
-EXPORT_PAGE_METADATA = True
+EXPORT_PAGE_METADATA = False
 
 # Do we like to export the page metadata in JSON?
 # This will be in addition to exporting the page metadata in XML.
 # EXPORT_PAGE_METADATA need to be set to 'True' to be able to export page metadata at all.
-EXPORT_PAGE_METADATA_JSON = True
+EXPORT_PAGE_METADATA_JSON = False
 
 # Other variables used by the script.
 # URL to the CONTENTdm web services API.
-# MAIN_URL = 'https://server16944.contentdm.oclc.org/dmwebservices/index.php?q='
 MAIN_URL = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q='.format(CDM_SERVER_NUMBER)
 
+# Path to the output folder where you'll find the final xml file
+OUTPUT_FOLDER = REL_PATH + "output/"
+
 rec_num = 0  # Record counter
+
+
+def get_list_of_collection_aliases():
+    """
+    Query CONTENTdm and return a list of collecton aliases
+    """
+
+    # GET collections
+    query_url_collections = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q=dmGetCollectionList/json'.format(CDM_SERVER_NUMBER)
+
+    # Query CONTENTdm and return records; if failure, log problem.
+    try:
+        res = requests.get(query_url_collections)
+        items = res.json()
+    except:
+        items = []
+        pass
+
+    # Create a list of aliases. Remove first letter which is a slash.
+    return sorted([collection.get('alias')[1:] for collection in items])
 
 
 def query_contentdm(query_map):
@@ -112,7 +150,7 @@ def query_contentdm(query_map):
     # Query CONTENTdm and return records; if failure, log problem.
     try:
         req = requests.get(query_url)
-        items = json.loads(req.content)
+        items = req.json()
     except:
         items = []
         pass
@@ -120,44 +158,30 @@ def query_contentdm(query_map):
     return items
 
 
-def get_list_of_collection_aliases():
-    """
-    Query CONTENTdm and return a list of collecton aliases
-    """
-
-    # GET collections
-    query_url_collections = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q=dmGetCollectionList/json'.format(CDM_SERVER_NUMBER)
-
-    # Query CONTENTdm and return records; if failure, log problem.
-    try:
-        res = requests.get(query_url_collections)
-        items = res.json()
-    except:
-        items = []
-        pass
-
-    # Create a list of aliases. Remove first letter which is a slash.
-    return sorted([collection.get('alias')[1:] for collection in items])
-
-
-def get_number_of_records_in_collection(alias, start_at):
-    query_map = {
-        'alias': alias,
-        'searchstrings': '0',
-        'fields': 'dmcreated',
-        'sortby': 'dmcreated!dmrecord',
-        'maxrecs': CHUNK_SIZE,
-        'start_at': start_at,
-        'supress': 1,
-        'docptr': 0,
-        'suggest': 0,
-        'facets': 0,
-        'format': 'json'}
+def get_number_of_records_in_collection(query_map):
     # Perform a preliminary query to determine how many records are in the current collection,
     # and to determine the number of queries required to get all the records.
     prelim_results = query_contentdm(query_map)
 
     return prelim_results['pager']['total']
+
+
+def get_collection_sources(alias):
+    # If a customer is using another field that source for the collections,
+    # this query needs to be updated.
+    query_url = '{main_url}dmGetCollectionFieldVocabulary/{alias}/source/0/1/json'.format(
+        main_url=MAIN_URL,
+        alias=alias)
+
+    # Query CONTENTdm and return records; if failure, log problem.
+    try:
+        req = requests.get(query_url)
+        items = req.json()
+    except:
+        items = []
+        pass
+
+    return items
 
 
 def get_compound_object_info(alias, pointer, format='json'):
@@ -366,7 +390,7 @@ def get_bib_record(collection_alias, cdm_recid):
     return record, record_compound_file_metadata
 
 
-def save_output_xml_to_file(collection, alias, processed_chunks):
+def save_output_xml_to_file(collection, alias, processed_chunks, source_nb):
 
     # Create output folder if it does not exists.
     output_path = Path(OUTPUT_FOLDER)
@@ -374,11 +398,42 @@ def save_output_xml_to_file(collection, alias, processed_chunks):
         output_path.mkdir()
 
     local_file_name = Path(output_path,
-                           'cdexport_{}_{:03}.xml'.format(alias,
-                                                          processed_chunks))
+                           'cdexport_{}_{:03}_{:03}.xml'.format(alias,
+                                                                processed_chunks,
+                                                                source_nb))
     with open(str(local_file_name), 'wb') as xmlfile:
         xmlfile.write(tostring(collection, pretty_print=True, encoding='utf-8'))
 
+
+def run_export_list_of_records():
+
+    # You can make sure it is the main record ID (not child compund ID) by
+    # checking that such a query returns -1 in the parent key.
+    # https://server15999.contentdm.oclc.org/dmwebservices/index.php?q=GetParent/p15999coll22/6664/json
+
+    collection = E.collection()
+    compound_file_metadata = {}  # Export page metadata in a JSON file.
+
+    aliases = []
+
+    for collection_alias, cdm_recid in MANUAL_EXPORT_LIST:
+        aliases.append(collection_alias)
+
+        print('Processing ', cdm_recid)
+
+        # Create the bib record with the contentDM record structure.
+        record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
+
+        collection.append(record)
+
+        if record_compound_file_metadata:
+            compound_file_metadata[cdm_recid] = record_compound_file_metadata
+
+    save_output_xml_to_file(collection, 'multiple', 1, 1)
+
+    if EXPORT_PAGE_METADATA_JSON:
+        with open(str(Path(OUTPUT_FOLDER, 'compound_file_metadata.json')), 'w') as f:
+            f.write(json.dumps(compound_file_metadata))
 
 
 def run_batch():
@@ -392,13 +447,26 @@ def run_batch():
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
 
+    all_cdm_recids = []  # Used to check for duplicate record export.
+
     for alias in collection_aliases:
 
-        # We need to restart the start_at number for each collection.
-        start_at = START_AT
+        collection_cdm_recids = []  # Used to check for duplicate record export on a collection level.
 
         # Get the number of records in a collection and calculate the number of chunks.
-        nb_records_in_collection = get_number_of_records_in_collection(alias, start_at)
+        query_map = {
+            'alias': alias,
+            'searchstrings': '0',
+            'fields': 'dmcreated',
+            'sortby': 'dmcreated!dmrecord',
+            'maxrecs': CHUNK_SIZE,
+            'start_at': 1,
+            'supress': 1,
+            'docptr': 0,
+            'suggest': 0,
+            'facets': 0,
+            'format': 'json'}
+        nb_records_in_collection = get_number_of_records_in_collection(query_map)
 
         logger.info("Total number of records in collection: %s is %s" % (alias, nb_records_in_collection))
 
@@ -406,71 +474,132 @@ def run_batch():
         if not nb_records_in_collection:
             continue
 
-        # We add one chunk, then round down.
-        num_chunks = nb_records_in_collection / CHUNK_SIZE + 1
-        num_chunks = math.floor(num_chunks)
+        # The querydm API can not export paginate more than 10 000 records.
+        # It will then start to export the same records multiple times!
+        # To avoid this, we need to query some bibliographic metadata to split
+        # the results to below 10 000 records.
+        # We will first try to split by the sub-collection (source).
+        if nb_records_in_collection > 10000:
+            total_number_in_sources = 0
+            source_info = []
+            # Frist, we get the list of sub collections
+            sources = get_collection_sources(alias)
+            # Second, for each source, we query to get the number of records per source.
+            for source in sources:
+                search_string = '{index}^{query_string}^exact^and'.format(index='source',
+                                                                          query_string=source)
 
-        compound_file_metadata = {}  # Export page metadata in a JSON file.
+                query_map = {
+                    'alias': alias,
+                    'searchstrings': search_string,
+                    'fields': 'dmcreated',
+                    'sortby': 'dmcreated', # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2.
+                    'maxrecs': CHUNK_SIZE,
+                    'start_at': 1,
+                    'supress': 1,
+                    'docptr': 0,
+                    'suggest': 0,
+                    'facets': 0,
+                    'format': 'json'}
+                nb_records_in_source = get_number_of_records_in_collection(query_map)
+                if nb_records_in_source > 0:
+                    source_info.append({'source': source,
+                                        'count': nb_records_in_source})
+                    total_number_in_sources += nb_records_in_source
+            if not nb_records_in_collection == total_number_in_sources:
+                logger.warning("The number of records the collection %s does not match the number of records in the sub-collections/sources. %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
+        else:
+            source_info = [{'source': '',
+                             'count': nb_records_in_collection}]
 
-        print("Retrieving structural file for the %s collection..." % (alias,))
+        for i, source in enumerate(source_info):
 
-        processed_chunks = 1
-        while processed_chunks <= num_chunks:
-            # For each chunk, create a new collection xml object.
-            collection = E.collection()
-            print('Start at: ', start_at)
+            # We need to restart the start_at number for each collection and each source value.
+            start_at = START_AT
 
-            query_map = {
-            'alias': alias,
-            'searchstrings': '0',
-            'fields': 'dmcreated',
-            'sortby': 'dmcreated!dmrecord',
-            'maxrecs': CHUNK_SIZE,
-            'start_at': start_at,
-            'supress': 1,
-            'docptr': 0,
-            'suggest': 0,
-            'facets': 0,
-            'format': 'json'}
+            # We add one chunk, then round down.
+            num_chunks = source.get('count') / CHUNK_SIZE + 1
+            num_chunks = math.floor(num_chunks)
 
-            # Query CONTENTdm for all records in a collection for the defined chunk.
-            results = query_contentdm(query_map)
-            if not results:
-                logger.warning("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s" % (start_at,))
-                continue
+            compound_file_metadata = {}  # Export page metadata in a JSON file.
 
-            # We are preparing the "start_at" number we will use in the next chunk.
-            start_at = CHUNK_SIZE * processed_chunks + 1
+            print("Retrieving structural file for the %s collection..." % (alias,))
 
-            # Loop through each record in the processed chunk.
-            for results_record in results['records']:
-                rec_num += 1
-                print(rec_num)
+            processed_chunks = 1
+            while processed_chunks <= num_chunks:
+                # For each chunk, create a new collection xml object.
+                collection = E.collection()
+                print('Start at: ', start_at)
 
-                collection_alias = results_record['collection']
-                cdm_recid = str(results_record['pointer'])
+                if source.get('source'):
+                    search_string = '{index}^{query_string}^exact^and'.format(index='source',
+                                                                              query_string=source.get('source'))
+                else:
+                    search_string = '0'
 
-                # Create the bib record with the contentDM record structure.
-                record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
+                query_map = {
+                    'alias': alias,
+                    'searchstrings': search_string,
+                    'fields': 'dmcreated',
+                    'sortby': 'dmcreated!dmrecord',
+                    'maxrecs': CHUNK_SIZE,
+                    'start_at': start_at,
+                    'supress': 1,
+                    'docptr': 0,
+                    'suggest': 0,
+                    'facets': 0,
+                    'format': 'json'}
 
-                # Save the compound file metadata in a separate JSON file.
-                if record_compound_file_metadata:
-                    compound_file_metadata[cdm_recid] = record_compound_file_metadata
+                # Query CONTENTdm for all records in a collection for the defined chunk.
+                results = query_contentdm(query_map)
+                if not results:
+                    logger.warning("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s" % (start_at,))
+                    continue
 
-                # Append the record to the collection
-                collection.append(record)
-                if LAST_REC != 0:
-                    if rec_num == LAST_REC:
-                        save_output_xml_to_file(collection, alias, processed_chunks)
+                # We are preparing the "start_at" number we will use in the next chunk.
+                start_at = CHUNK_SIZE * processed_chunks + 1
 
-                        # To get out of the while loop, make
-                        # processed_chunks higher than num_chunks.
-                        processed_chunks = num_chunks + 1
-                        break
+                # Loop through each record in the processed chunk.
+                for results_record in results['records']:
+                    rec_num += 1
+                    print(rec_num)
 
-            save_output_xml_to_file(collection, alias, processed_chunks)
+                    collection_alias = results_record['collection']
+                    if collection_alias.startswith('/'):
+                        collection_alias = collection_alias[1:]
+                    cdm_recid = str(results_record['pointer'])
 
-            processed_chunks += 1
+                    # After introducing querying sub_collections/sources,
+                    # we want to make sure that a record is not exported multiple times.
+                    if cdm_recid in collection_cdm_recids:
+                        logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
+                    collection_cdm_recids.append(cdm_recid)
+
+                    if cdm_recid in all_cdm_recids:
+                        logger.warning("The record %s is already expported. Duplicate!" % (cdm_recid,))
+                    all_cdm_recids.append(cdm_recid)
+
+                    # Create the bib record with the contentDM record structure.
+                    record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
+
+                    # Save the compound file metadata in a separate JSON file.
+                    if record_compound_file_metadata:
+                        compound_file_metadata[cdm_recid] = record_compound_file_metadata
+
+                    # Append the record to the collection
+                    collection.append(record)
+                    if LAST_REC != 0:
+                        if rec_num == LAST_REC:
+                            save_output_xml_to_file(collection, alias, processed_chunks, i + 1)
+
+                            # To get out of the while loop, make
+                            # processed_chunks higher than num_chunks.
+                            processed_chunks = num_chunks + 1
+                            break
+
+                save_output_xml_to_file(collection, alias, processed_chunks, i + 1)
+
+                processed_chunks += 1
 
         if EXPORT_PAGE_METADATA_JSON:
             with open(str(Path(OUTPUT_FOLDER, 'compound_file_metadata_{}.json'.format(alias))), 'w') as f:
@@ -531,6 +660,8 @@ if __name__ == '__main__':
     logger = setup_logger(str(Path(OUTPUT_FOLDER, 'record_export.log')), 'record_export')
     logger = logging.getLogger("record_export")
     run_batch()
+
+    # run_export_list_of_records()
 
     # all_records = create_list_of_records(prelim_results['pager']['total'], num_chunks, START_AT)
     # print(len(all_records))
