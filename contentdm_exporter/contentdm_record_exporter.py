@@ -493,7 +493,7 @@ def run_batch():
                     'alias': alias,
                     'searchstrings': search_string,
                     'fields': 'dmcreated',
-                    'sortby': 'dmcreated', # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2.
+                    'sortby': 'dmcreated',  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2.
                     'maxrecs': CHUNK_SIZE,
                     'start_at': 1,
                     'supress': 1,
@@ -523,7 +523,7 @@ def run_batch():
 
             compound_file_metadata = {}  # Export page metadata in a JSON file.
 
-            print("Retrieving structural file for the %s collection..." % (alias,))
+            print("Retrieving structural file for the collection: %s" % (alias,))
 
             processed_chunks = 1
             while processed_chunks <= num_chunks:
@@ -541,7 +541,7 @@ def run_batch():
                     'alias': alias,
                     'searchstrings': search_string,
                     'fields': 'dmcreated',
-                    'sortby': 'dmcreated!dmrecord',
+                    'sortby': 'dmcreated',  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2.
                     'maxrecs': CHUNK_SIZE,
                     'start_at': start_at,
                     'supress': 1,
