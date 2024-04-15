@@ -451,6 +451,8 @@ def run_batch():
 
     for alias in collection_aliases:
 
+        print("Processing the collection: %s" % (alias,))
+
         collection_cdm_recids = []  # Used to check for duplicate record export on a collection level.
 
         # Get the number of records in a collection and calculate the number of chunks.
@@ -523,7 +525,8 @@ def run_batch():
 
             compound_file_metadata = {}  # Export page metadata in a JSON file.
 
-            print("Retrieving structural file for the collection: %s" % (alias,))
+            if source.get('source'):
+                print("Processing the source: %s" % (alias,))
 
             processed_chunks = 1
             while processed_chunks <= num_chunks:
