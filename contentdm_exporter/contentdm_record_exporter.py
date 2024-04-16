@@ -189,13 +189,8 @@ def get_collection_sources(alias):
         pass
 
     sources = facet_fields.get('facets', {}).get('source')
-    items = []
-    total_count = 0
-    for source in sources:
-        items.append(source.get('title'))
-        total_count += source.get('count')
 
-    return items, total_count
+    return sources
 
 
 def get_compound_object_info(alias, pointer, format='json'):
@@ -497,11 +492,14 @@ def run_batch():
             total_number_in_sources = 0
             source_info = []
             # Frist, we get the list of sub collections
-            sources, total_count = get_collection_sources(alias)
-            if nb_records_in_collection != total_count:
-                logger.warning("The number of records the collection %s does not match the number of records from facet: %s vs. %s" % (alias, nb_records_in_collection, total_count))
+            sources = get_collection_sources(alias)
+
             # Second, for each source, we query to get the number of records per source.
-            for source in sources:
+            total_count = 0
+            for source_info in sources:
+                source = source_info.get('title')
+                source_count = source_info.get('count')
+                total_count += source_count
                 search_string = '{index}^{query_string}^exact^and'.format(index='source',
                                                                           query_string=source)
 
@@ -522,10 +520,15 @@ def run_batch():
                     source_info.append({'source': source,
                                         'count': nb_records_in_source})
                     total_number_in_sources += nb_records_in_source
-                if total_count != nb_records_in_source:
-                    logger.warning("The number of records the collection %s does not match the number of records in the sources %s: %s vs. %s" % (alias, source, nb_records_in_collection, total_number_in_sources))
+
+                if source_count != nb_records_in_source:
+                    logger.warning("The number of records the collection %s does not match the number of records in the source %s: %s vs. %s" % (alias, source, nb_records_in_collection, total_number_in_sources))
+
+            if nb_records_in_collection != total_count:
+                logger.warning("The number of records the collection %s does not match the total count from source: %s vs. %s" % (alias, nb_records_in_collection, total_count))
+
             if nb_records_in_collection != total_number_in_sources:
-                logger.warning("The number of records the collection %s does not match the number of records in the sub-collections/sources: %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
+                logger.warning("The number of records the collection %s does not match the total number of records in the sources: %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
         else:
             source_info = [{'source': '',
                              'count': nb_records_in_collection}]
