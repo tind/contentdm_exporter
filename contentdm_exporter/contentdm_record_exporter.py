@@ -522,8 +522,10 @@ def run_batch():
                     source_info.append({'source': source,
                                         'count': nb_records_in_source})
                     total_number_in_sources += nb_records_in_source
+                if total_count != nb_records_in_source:
+                    logger.warning("The number of records the collection %s does not match the number of records in the sources %s: %s vs. %s" % (alias, source, nb_records_in_collection, total_number_in_sources))
             if nb_records_in_collection != total_number_in_sources:
-                logger.warning("The number of records the collection %s does not match the number of records in the sub-collections/sources. %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
+                logger.warning("The number of records the collection %s does not match the number of records in the sub-collections/sources: %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
         else:
             source_info = [{'source': '',
                              'count': nb_records_in_collection}]
