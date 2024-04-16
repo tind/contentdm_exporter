@@ -40,6 +40,8 @@ from logger import setup_logger
 CDM_SERVER_NUMBER = '17218'
 # CDM_SERVER_NUMBER = '15999'
 
+CDM_WEBSITE_URL = 'https://digitalarchives.usi.edu/'
+
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
 REL_PATH = "/home/ubuntu/migration/USI/da/"
@@ -50,7 +52,7 @@ REL_PATH = "/home/ubuntu/migration/USI/da/"
 # Only set this variable if you plan to export a single collection.
 # Used mainly for testing purposes.
 # ALIAS = "p17218coll3"
-ALIAS = ""
+ALIAS = "p17218coll2"
 
 # Use the config below if you want to export particular records for different collections.
 # The format is a list of tuples with collection name and record IDs.
@@ -107,7 +109,8 @@ def get_list_of_collection_aliases():
     """
 
     # GET collections
-    query_url_collections = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q=dmGetCollectionList/json'.format(CDM_SERVER_NUMBER)
+    query_url_collections = '{main_url}dmGetCollectionList/json'.format(
+        main_url=MAIN_URL)
 
     # Query CONTENTdm and return records; if failure, log problem.
     try:
@@ -169,19 +172,30 @@ def get_number_of_records_in_collection(query_map):
 def get_collection_sources(alias):
     # If a customer is using another field that source for the collections,
     # this query needs to be updated.
-    query_url = '{main_url}dmGetCollectionFieldVocabulary/{alias}/source/0/1/json'.format(
-        main_url=MAIN_URL,
+    # query_url = '{main_url}dmGetCollectionFieldVocabulary/{alias}/source/0/1/json'.format(
+    #     main_url=MAIN_URL,
+    #     alias=alias)
+    # The previous method did not work well. We will try using the source facet directly.
+    query_url = '{main_url}digital/api/facet/facetfield/source/collection/{alias}'.format(
+        main_url=CDM_WEBSITE_URL,
         alias=alias)
 
     # Query CONTENTdm and return records; if failure, log problem.
     try:
         req = requests.get(query_url)
-        items = req.json()
+        facet_fields = req.json()
     except:
-        items = []
+        facet_fields = {}
         pass
 
-    return items
+    sources = facet_fields.get('facets', {}).get('source')
+    items = []
+    total_count = 0
+    for source in sources:
+        items.append(source.get('title'))
+        total_count += source.get('count')
+
+    return items, total_count
 
 
 def get_compound_object_info(alias, pointer, format='json'):
@@ -390,7 +404,7 @@ def get_bib_record(collection_alias, cdm_recid):
     return record, record_compound_file_metadata
 
 
-def save_output_xml_to_file(collection, alias, processed_chunks, source_nb):
+def save_output_xml_to_file(collection, alias, source_nb, processed_chunks):
 
     # Create output folder if it does not exists.
     output_path = Path(OUTPUT_FOLDER)
@@ -399,8 +413,8 @@ def save_output_xml_to_file(collection, alias, processed_chunks, source_nb):
 
     local_file_name = Path(output_path,
                            'cdexport_{}_{:03}_{:03}.xml'.format(alias,
-                                                                processed_chunks,
-                                                                source_nb))
+                                                                source_nb,
+                                                                processed_chunks))
     with open(str(local_file_name), 'wb') as xmlfile:
         xmlfile.write(tostring(collection, pretty_print=True, encoding='utf-8'))
 
@@ -447,8 +461,6 @@ def run_batch():
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
 
-    all_cdm_recids = []  # Used to check for duplicate record export.
-
     for alias in collection_aliases:
 
         print("Processing the collection: %s" % (alias,))
@@ -485,7 +497,9 @@ def run_batch():
             total_number_in_sources = 0
             source_info = []
             # Frist, we get the list of sub collections
-            sources = get_collection_sources(alias)
+            sources, total_count = get_collection_sources(alias)
+            if nb_records_in_collection != total_count:
+                logger.warning("The number of records the collection %s does not match the number of records from facet: %s vs. %s" % (alias, nb_records_in_collection, total_count))
             # Second, for each source, we query to get the number of records per source.
             for source in sources:
                 search_string = '{index}^{query_string}^exact^and'.format(index='source',
@@ -508,7 +522,7 @@ def run_batch():
                     source_info.append({'source': source,
                                         'count': nb_records_in_source})
                     total_number_in_sources += nb_records_in_source
-            if not nb_records_in_collection == total_number_in_sources:
+            if nb_records_in_collection != total_number_in_sources:
                 logger.warning("The number of records the collection %s does not match the number of records in the sub-collections/sources. %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
         else:
             source_info = [{'source': '',
@@ -578,10 +592,6 @@ def run_batch():
                         logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
                     collection_cdm_recids.append(cdm_recid)
 
-                    if cdm_recid in all_cdm_recids:
-                        logger.warning("The record %s is already expported. Duplicate!" % (cdm_recid,))
-                    all_cdm_recids.append(cdm_recid)
-
                     # Create the bib record with the contentDM record structure.
                     record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
 
@@ -593,14 +603,14 @@ def run_batch():
                     collection.append(record)
                     if LAST_REC != 0:
                         if rec_num == LAST_REC:
-                            save_output_xml_to_file(collection, alias, processed_chunks, i + 1)
+                            save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
 
                             # To get out of the while loop, make
                             # processed_chunks higher than num_chunks.
                             processed_chunks = num_chunks + 1
                             break
 
-                save_output_xml_to_file(collection, alias, processed_chunks, i + 1)
+                save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
 
                 processed_chunks += 1
 
