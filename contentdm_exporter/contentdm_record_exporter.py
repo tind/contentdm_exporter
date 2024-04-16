@@ -522,13 +522,13 @@ def run_batch():
                     total_number_in_sources += nb_records_in_source
 
                 if source_count != nb_records_in_source:
-                    logger.warning("The number of records the collection %s does not match the number of records in the source %s: %s vs. %s" % (alias, source, nb_records_in_collection, total_number_in_sources))
+                    logger.warning("The number of records queried on the collection %s and source %s does not match the number from the facet. %s vs. %s" % (alias, source, nb_records_in_source, source_count))
 
             if nb_records_in_collection != total_count:
                 logger.warning("The number of records the collection %s does not match the total count from source: %s vs. %s" % (alias, nb_records_in_collection, total_count))
 
             if nb_records_in_collection != total_number_in_sources:
-                logger.warning("The number of records the collection %s does not match the total number of records in the sources: %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
+                logger.warning("The number of records the collection %s does not match the total number of records in the sources. %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
         else:
             source_info = [{'source': '',
                              'count': nb_records_in_collection}]
