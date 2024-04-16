@@ -33,6 +33,7 @@ from defusedxml.lxml import (tostring,
 from lxml.builder import E
 import logging
 from logger import setup_logger
+import urllib.parse
 
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
@@ -501,7 +502,7 @@ def run_batch():
                 source_count = source_output.get('count')
                 total_count += source_count
                 search_string = '{index}^{query_string}^exact^and'.format(index='source',
-                                                                          query_string=source)
+                                                                          query_string=urllib.parse.quote_plus(source))
 
                 query_map = {
                     'alias': alias,
@@ -555,7 +556,7 @@ def run_batch():
 
                 if source.get('source'):
                     search_string = '{index}^{query_string}^exact^and'.format(index='source',
-                                                                              query_string=source.get('source'))
+                                                                              query_string=urllib.parse.quote_plus(source.get('source')))
                 else:
                     search_string = '0'
 
