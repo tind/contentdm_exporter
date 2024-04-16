@@ -496,9 +496,9 @@ def run_batch():
 
             # Second, for each source, we query to get the number of records per source.
             total_count = 0
-            for source_info in sources:
-                source = source_info.get('title')
-                source_count = source_info.get('count')
+            for source_output in sources:
+                source = source_output.get('title')
+                source_count = source_output.get('count')
                 total_count += source_count
                 search_string = '{index}^{query_string}^exact^and'.format(index='source',
                                                                           query_string=source)
