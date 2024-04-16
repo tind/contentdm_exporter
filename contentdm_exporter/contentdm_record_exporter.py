@@ -53,7 +53,7 @@ REL_PATH = "/home/ubuntu/migration/USI/da/"
 # Only set this variable if you plan to export a single collection.
 # Used mainly for testing purposes.
 # ALIAS = "p17218coll3"
-ALIAS = "p17218coll2"
+ALIAS = ""
 
 # Use the config below if you want to export particular records for different collections.
 # The format is a list of tuples with collection name and record IDs.
@@ -87,7 +87,7 @@ LAST_REC = 0
 
 # Do we like to export the page metadata?
 # Exporting the page metadata will increase the time to do the export.
-EXPORT_PAGE_METADATA = False
+EXPORT_PAGE_METADATA = True
 
 # Do we like to export the page metadata in JSON?
 # This will be in addition to exporting the page metadata in XML.
