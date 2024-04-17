@@ -408,9 +408,9 @@ def save_output_xml_to_file(collection, alias, source_nb, processed_chunks):
         output_path.mkdir()
 
     local_file_name = Path(output_path,
-                           'cdexport_{}_{:03}_{:03}.xml'.format(alias,
-                                                                source_nb,
-                                                                processed_chunks))
+                           'cdm_export_{}_{:03}_{:03}.xml'.format(alias,
+                                                                  source_nb,
+                                                                  processed_chunks))
     with open(str(local_file_name), 'wb') as xmlfile:
         xmlfile.write(tostring(collection, pretty_print=True, encoding='utf-8'))
 
@@ -578,6 +578,10 @@ def run_batch():
                 if not results:
                     logger.warning("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s" % (start_at,))
                     continue
+
+                # Save the dm_query records so that we can analyze them.
+                with open(str(Path(OUTPUT_FOLDER, 'dm_query_{}_{:03}_{:03}.json'.format(alias, i + 1, processed_chunks))), 'w') as f:
+                    f.write(json.dumps(results))
 
                 # We are preparing the "start_at" number we will use in the next chunk.
                 start_at = CHUNK_SIZE * processed_chunks + 1
