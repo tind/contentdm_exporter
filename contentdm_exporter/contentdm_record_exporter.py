@@ -117,7 +117,8 @@ def get_list_of_collection_aliases():
     try:
         res = requests.get(query_url_collections)
         items = res.json()
-    except:
+    except Exception as e:
+        logger.warning("The following API request failed: %s. Error: %s" % (query_url_collections, e))
         items = []
         pass
 
