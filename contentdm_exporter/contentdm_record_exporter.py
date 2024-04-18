@@ -501,11 +501,11 @@ def run_batch():
             # Second, for each source, we query to get the number of records per source.
             total_count = 0
             for source_output in sources:
-                source = source_output.get('title')
+                source_title = source_output.get('title')
                 source_count = source_output.get('count')
                 total_count += source_count
                 search_string = '{index}^{query_string}^exact^and'.format(index='source',
-                                                                          query_string=urllib.parse.quote_plus(source))
+                                                                          query_string=urllib.parse.quote_plus(source_title))
 
                 query_map = {
                     'alias': alias,
@@ -521,8 +521,8 @@ def run_batch():
                     'format': 'json'}
                 nb_records_in_source = get_number_of_records_in_collection(query_map)
                 if nb_records_in_source > 0:
-                    source_info.append({'source': source,
-                                        'count': nb_records_in_source})
+                    source_info.append({'source_title': source_title,
+                                        'source_count': nb_records_in_source})
                     total_number_in_sources += nb_records_in_source
 
                 if source_count != nb_records_in_source:
@@ -534,32 +534,30 @@ def run_batch():
             if nb_records_in_collection != total_number_in_sources:
                 logger.warning("The number of records the collection %s does not match the total number of records in the sources. %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
         else:
-            source_info = [{'source': '',
-                             'count': nb_records_in_collection}]
+            source_info = [{'source_title': '',
+                            'source_count': nb_records_in_collection}]
 
         for i, source in enumerate(source_info):
-
-            # We need to restart the start_at number for each collection and each source value.
-            start_at = START_AT
+            if source.get('source_title'):
+                print("Processing the source: %s" % (source.get('source_title'),))
 
             # We add one chunk, then round down.
-            num_chunks = source.get('count') / CHUNK_SIZE + 1
+            num_chunks = source.get('source_count') / CHUNK_SIZE + 1
             num_chunks = math.floor(num_chunks)
 
             compound_file_metadata = {}  # Export page metadata in a JSON file.
 
-            if source.get('source'):
-                print("Processing the source: %s" % (alias,))
-
+            # We need to restart the start_at number for each collection and each source value.
+            start_at = START_AT
             processed_chunks = 1
             while processed_chunks <= num_chunks:
                 # For each chunk, create a new collection xml object.
                 collection = E.collection()
                 print('Start at: ', start_at)
 
-                if source.get('source'):
+                if source.get('source_title'):
                     search_string = '{index}^{query_string}^exact^and'.format(index='source',
-                                                                              query_string=urllib.parse.quote_plus(source.get('source')))
+                                                                              query_string=urllib.parse.quote_plus(source.get('source_title')))
                 else:
                     search_string = '0'
 
@@ -590,92 +588,46 @@ def run_batch():
                 start_at = CHUNK_SIZE * processed_chunks + 1
 
                 # Loop through each record in the processed chunk.
-                # for results_record in results['records']:
-                #     rec_num += 1
-                #     print(rec_num)
+                for results_record in results['records']:
+                    rec_num += 1
+                    print(rec_num)
 
-                #     collection_alias = results_record['collection']
-                #     if collection_alias.startswith('/'):
-                #         collection_alias = collection_alias[1:]
-                #     cdm_recid = str(results_record['pointer'])
+                    collection_alias = results_record['collection']
+                    if collection_alias.startswith('/'):
+                        collection_alias = collection_alias[1:]
+                    cdm_recid = str(results_record['pointer'])
 
-                #     # After introducing querying sub_collections/sources,
-                #     # we want to make sure that a record is not exported multiple times.
-                #     if cdm_recid in collection_cdm_recids:
-                #         logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
-                #     collection_cdm_recids.append(cdm_recid)
+                    # After introducing querying sub_collections/sources,
+                    # we want to make sure that a record is not exported multiple times.
+                    if cdm_recid in collection_cdm_recids:
+                        logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
+                    collection_cdm_recids.append(cdm_recid)
 
-                #     # Create the bib record with the contentDM record structure.
-                #     record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
+                    # # Create the bib record with the contentDM record structure.
+                    # record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
 
-                #     # Save the compound file metadata in a separate JSON file.
-                #     if record_compound_file_metadata:
-                #         compound_file_metadata[cdm_recid] = record_compound_file_metadata
+                    # # Save the compound file metadata in a separate JSON file.
+                    # if record_compound_file_metadata:
+                    #     compound_file_metadata[cdm_recid] = record_compound_file_metadata
 
-                #     # Append the record to the collection
-                #     collection.append(record)
-                #     if LAST_REC != 0:
-                #         if rec_num == LAST_REC:
-                #             save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
+                    # # Append the record to the collection
+                    # collection.append(record)
+                    if LAST_REC != 0:
+                        if rec_num == LAST_REC:
+                            save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
 
-                #             # To get out of the while loop, make
-                #             # processed_chunks higher than num_chunks.
-                #             processed_chunks = num_chunks + 1
-                #             break
+                            # To get out of the while loop, make
+                            # processed_chunks higher than num_chunks.
+                            processed_chunks = num_chunks + 1
+                            break
 
-                # save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
+                save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
 
                 processed_chunks += 1
 
         if EXPORT_PAGE_METADATA_JSON:
             with open(str(Path(OUTPUT_FOLDER, 'compound_file_metadata_{}.json'.format(alias))), 'w') as f:
                 f.write(json.dumps(compound_file_metadata))
-
-
-# def create_list_of_records(total_recs, num_chunks, start_at):
-#     all_records = []
-#     global rec_num
-
-#     print("Retrieving structural file for the %s collection..." % (ALIAS,))
-
-#     processed_chunks = 1
-#     while processed_chunks <= num_chunks:
-#         # For each chunk, create a new collection xml object.
-#         print('Start at: ', start_at)
-
-#         # Query CONTENTdm for all records in a collection for the defined chunk.
-#         results = query_contentdm(start_at)
-#         if not results:
-#             print("Could not connect to CONTENTdm to start retrieving chunk starting at: ",
-#                   start_at)
-#             exit()
-#         start_at = CHUNK_SIZE * processed_chunks + 1
-
-#         # Loop through each record in the processed chunk.
-#         for results_record in results['records']:
-#             rec_num += 1
-#             print(rec_num)
-
-#             # Create a new xml record object.
-#             record = {}
-
-#             # Append CONTENTdm record ID to new record object.
-#             record['cdmid'] = str(results_record['pointer'])
-
-#             # Get the records compound information.
-#             compound_info = get_compound_object_info(results_record['collection'],
-#                                                      str(results_record['pointer']),
-#                                                      'json')
-
-#             record['pages'] = [p.get('pageptr') for p in compound_info.get('page', []) if p.get('pageptr')]
-#             all_records.append(record)
-
-#         processed_chunks += 1
-
-#     with open(str(Path(OUTPUT_FOLDER, 'all_records.json')), 'w') as f:
-#         f.write(json.dumps(all_records))
-
-#     return all_records
 
 
 if __name__ == '__main__':
@@ -688,6 +640,3 @@ if __name__ == '__main__':
     run_batch()
 
     # run_export_list_of_records()
-
-    # all_records = create_list_of_records(prelim_results['pager']['total'], num_chunks, START_AT)
-    # print(len(all_records))
