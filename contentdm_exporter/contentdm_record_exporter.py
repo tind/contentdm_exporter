@@ -156,7 +156,8 @@ def query_contentdm(query_map):
     try:
         req = requests.get(query_url)
         items = req.json()
-    except:
+    except Exception as e:
+        logger.warning("The following API request failed: %s. Error: %s" % (query_url, e))
         items = []
         pass
 
@@ -186,11 +187,12 @@ def get_collection_sources(alias):
     try:
         req = requests.get(query_url)
         facet_fields = req.json()
-    except:
+    except Exception as e:
+        logger.warning("The following API request failed: %s. Error: %s" % (query_url, e))
         facet_fields = {}
         pass
 
-    sources = facet_fields.get('facets', {}).get('source')
+    sources = facet_fields.get('facets', {}).get('source', [])
 
     return sources
 
