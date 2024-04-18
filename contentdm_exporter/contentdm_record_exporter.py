@@ -101,6 +101,26 @@ MAIN_URL = 'https://server{}.contentdm.oclc.org/dmwebservices/index.php?q='.form
 # Path to the output folder where you'll find the final xml file
 OUTPUT_FOLDER = REL_PATH + "output/"
 
+
+# Create output folder if it does not exists.
+output_path = Path(OUTPUT_FOLDER)
+if not output_path.is_dir():
+    output_path.mkdir()
+
+cdm_export_collections_path = Path(output_path, 'collections')
+if not cdm_export_collections_path.is_dir():
+    cdm_export_collections_path.mkdir()
+
+dm_query_files_path = Path(output_path, 'dm_query_files')
+if not dm_query_files_path.is_dir():
+    dm_query_files_path.mkdir()
+
+compound_metadata_files_path = Path(output_path, 'compound_metadata_files')
+if not compound_metadata_files_path.is_dir():
+    compound_metadata_files_path.mkdir()
+
+
+
 rec_num = 0  # Record counter
 
 
@@ -405,12 +425,11 @@ def get_bib_record(collection_alias, cdm_recid):
 
 def save_output_xml_to_file(collection, alias, source_nb, processed_chunks):
 
-    # Create output folder if it does not exists.
-    output_path = Path(OUTPUT_FOLDER)
-    if not output_path.is_dir():
-        output_path.mkdir()
+    collection_path = Path(cdm_export_collections_path, alias)
+    if not collection_path.is_dir():
+        collection_path.mkdir()
 
-    local_file_name = Path(output_path,
+    local_file_name = Path(collection_path,
                            'cdm_export_{}_{:03}_{:03}.xml'.format(alias,
                                                                   source_nb,
                                                                   processed_chunks))
@@ -511,7 +530,7 @@ def run_batch():
                     'alias': alias,
                     'searchstrings': search_string,
                     'fields': 'dmcreated',
-                    'sortby': 'dmcreated',  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2.
+                    'sortby': 'dmcreated',  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2. Only dmrecord works too!
                     'maxrecs': CHUNK_SIZE,
                     'start_at': 1,
                     'supress': 1,
@@ -565,7 +584,7 @@ def run_batch():
                     'alias': alias,
                     'searchstrings': search_string,
                     'fields': 'dmcreated',
-                    'sortby': 'dmcreated',  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2.
+                    'sortby': 'dmcreated',  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2. Only dmrecord works too!
                     'maxrecs': CHUNK_SIZE,
                     'start_at': start_at,
                     'supress': 1,
@@ -580,6 +599,9 @@ def run_batch():
                     logger.warning("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s" % (start_at,))
                     continue
 
+                # We have had an issue where the export contains duplicates.
+                # It is because the pagination API is not stable enough, so that it has sometimes got fewer records in the result when paginating.
+                # This results in the same records being exported twice.
                 # For debugging purposes, we will add the query URL to the results export.
                 query_url = '{main_url}dmQuery/{alias}/{searchstrings}/{fields}/{sortby}/{maxrecs}/{start_at}/{docptr}/{suggest}/{facets}/{format}'.format(
                     main_url=MAIN_URL,
@@ -597,8 +619,8 @@ def run_batch():
 
                 results['pager']['query_url'] = query_url
 
-                # Save the dm_query records so that we can analyze them.
-                with open(str(Path(OUTPUT_FOLDER, 'dm_query_{}_{:03}_{:03}.json'.format(alias, i + 1, processed_chunks))), 'w') as f:
+                # Save the dm_query records so that we can analyze it.
+                with open(str(Path(dm_query_files_path, 'dm_query_{}_{:03}_{:03}.json'.format(alias, i + 1, processed_chunks))), 'w') as f:
                     f.write(json.dumps(results))
 
                 # We are preparing the "start_at" number we will use in the next chunk.
@@ -608,6 +630,9 @@ def run_batch():
                 for results_record in results['records']:
                     rec_num += 1
                     print(rec_num)
+
+                    if results_record['parentobject'] != -1:
+                        logger.warning("The parentobject for cdmid %s is not -1: %s" % (cdm_recid, results_record['parentobject']))
 
                     collection_alias = results_record['collection']
                     if collection_alias.startswith('/'):
@@ -620,15 +645,15 @@ def run_batch():
                         logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
                     collection_cdm_recids.append(cdm_recid)
 
-                    # # Create the bib record with the contentDM record structure.
-                    # record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
+                    # Create the bib record with the contentDM record structure.
+                    record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
 
-                    # # Save the compound file metadata in a separate JSON file.
-                    # if record_compound_file_metadata:
-                    #     compound_file_metadata[cdm_recid] = record_compound_file_metadata
+                    # Save the compound file metadata in a separate JSON file.
+                    if record_compound_file_metadata:
+                        compound_file_metadata[cdm_recid] = record_compound_file_metadata
 
-                    # # # Append the record to the collection
-                    # collection.append(record)
+                    # # Append the record to the collection
+                    collection.append(record)
                     if LAST_REC != 0:
                         if rec_num == LAST_REC:
                             save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
@@ -643,15 +668,12 @@ def run_batch():
                 processed_chunks += 1
 
         if EXPORT_PAGE_METADATA_JSON:
-            with open(str(Path(OUTPUT_FOLDER, 'compound_file_metadata_{}.json'.format(alias))), 'w') as f:
+            with open(str(Path(compound_metadata_files_path, 'compound_file_metadata_{}.json'.format(alias))), 'w') as f:
                 f.write(json.dumps(compound_file_metadata))
 
 
 if __name__ == '__main__':
     # Create output folder if it does not exists.
-    output_path = Path(OUTPUT_FOLDER)
-    if not output_path.is_dir():
-        output_path.mkdir()
     logger = setup_logger(str(Path(OUTPUT_FOLDER, 'record_export.log')), 'record_export')
     logger = logging.getLogger("record_export")
     run_batch()
