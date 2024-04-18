@@ -494,15 +494,15 @@ def run_batch():
         # We will first try to split by the sub-collection (source).
         if nb_records_in_collection > 10000:
             total_number_in_sources = 0
-            source_info = []
+            source_infos = []
             # Frist, we get the list of sub collections
             sources = get_collection_sources(alias)
 
             # Second, for each source, we query to get the number of records per source.
             total_count = 0
-            for source_output in sources:
-                source_title = source_output.get('title')
-                source_count = source_output.get('count')
+            for source_facet in sources:
+                source_title = source_facet.get('title')
+                source_count = source_facet.get('count')
                 total_count += source_count
                 search_string = '{index}^{query_string}^exact^and'.format(index='source',
                                                                           query_string=urllib.parse.quote_plus(source_title))
@@ -521,12 +521,12 @@ def run_batch():
                     'format': 'json'}
                 nb_records_in_source = get_number_of_records_in_collection(query_map)
                 if nb_records_in_source > 0:
-                    source_info.append({'source_title': source_title,
-                                        'source_count': nb_records_in_source})
+                    source_infos.append({'source_title': source_title,
+                                         'source_count': nb_records_in_source})
                     total_number_in_sources += nb_records_in_source
 
                 if source_count != nb_records_in_source:
-                    logger.warning("The number of records queried on the collection %s and source %s does not match the number from the facet. %s vs. %s" % (alias, source, nb_records_in_source, source_count))
+                    logger.warning("The number of records queried on the collection %s and source %s does not match the number from the facet. %s vs. %s" % (alias, source_title, nb_records_in_source, source_count))
 
             if nb_records_in_collection != total_count:
                 logger.warning("The number of records the collection %s does not match the total count from source: %s vs. %s" % (alias, nb_records_in_collection, total_count))
@@ -534,15 +534,15 @@ def run_batch():
             if nb_records_in_collection != total_number_in_sources:
                 logger.warning("The number of records the collection %s does not match the total number of records in the sources. %s vs. %s" % (alias, nb_records_in_collection, total_number_in_sources))
         else:
-            source_info = [{'source_title': '',
-                            'source_count': nb_records_in_collection}]
+            source_infos = [{'source_title': '',
+                             'source_count': nb_records_in_collection}]
 
-        for i, source in enumerate(source_info):
-            if source.get('source_title'):
-                print("Processing the source: %s" % (source.get('source_title'),))
+        for i, source_info in enumerate(source_infos):
+            if source_info.get('source_title'):
+                print("Processing the source: %s" % (source_info.get('source_title'),))
 
             # We add one chunk, then round down.
-            num_chunks = source.get('source_count') / CHUNK_SIZE + 1
+            num_chunks = source_info.get('source_count') / CHUNK_SIZE + 1
             num_chunks = math.floor(num_chunks)
 
             compound_file_metadata = {}  # Export page metadata in a JSON file.
@@ -555,9 +555,9 @@ def run_batch():
                 collection = E.collection()
                 print('Start at: ', start_at)
 
-                if source.get('source_title'):
+                if source_info.get('source_title'):
                     search_string = '{index}^{query_string}^exact^and'.format(index='source',
-                                                                              query_string=urllib.parse.quote_plus(source.get('source_title')))
+                                                                              query_string=urllib.parse.quote_plus(source_info.get('source_title')))
                 else:
                     search_string = '0'
 
@@ -579,6 +579,23 @@ def run_batch():
                 if not results:
                     logger.warning("No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s" % (start_at,))
                     continue
+
+                # For debugging purposes, we will add the query URL to the results export.
+                query_url = '{main_url}dmQuery/{alias}/{searchstrings}/{fields}/{sortby}/{maxrecs}/{start_at}/{docptr}/{suggest}/{facets}/{format}'.format(
+                    main_url=MAIN_URL,
+                    alias=query_map['alias'],
+                    searchstrings=query_map['searchstrings'],
+                    fields=query_map['fields'],
+                    sortby=query_map['sortby'],
+                    maxrecs=query_map['maxrecs'],
+                    start_at=query_map['start_at'],
+                    supress=query_map['supress'],
+                    docptr=query_map['docptr'],
+                    suggest=query_map['suggest'],
+                    facets=query_map['facets'],
+                    format=query_map['format'])
+
+                results['pager']['query_url'] = query_url
 
                 # Save the dm_query records so that we can analyze them.
                 with open(str(Path(OUTPUT_FOLDER, 'dm_query_{}_{:03}_{:03}.json'.format(alias, i + 1, processed_chunks))), 'w') as f:
@@ -610,7 +627,7 @@ def run_batch():
                     # if record_compound_file_metadata:
                     #     compound_file_metadata[cdm_recid] = record_compound_file_metadata
 
-                    # # Append the record to the collection
+                    # # # Append the record to the collection
                     # collection.append(record)
                     if LAST_REC != 0:
                         if rec_num == LAST_REC:
