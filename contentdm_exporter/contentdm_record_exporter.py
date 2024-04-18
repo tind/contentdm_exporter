@@ -587,40 +587,40 @@ def run_batch():
                 start_at = CHUNK_SIZE * processed_chunks + 1
 
                 # Loop through each record in the processed chunk.
-                for results_record in results['records']:
-                    rec_num += 1
-                    print(rec_num)
+                # for results_record in results['records']:
+                #     rec_num += 1
+                #     print(rec_num)
 
-                    collection_alias = results_record['collection']
-                    if collection_alias.startswith('/'):
-                        collection_alias = collection_alias[1:]
-                    cdm_recid = str(results_record['pointer'])
+                #     collection_alias = results_record['collection']
+                #     if collection_alias.startswith('/'):
+                #         collection_alias = collection_alias[1:]
+                #     cdm_recid = str(results_record['pointer'])
 
-                    # After introducing querying sub_collections/sources,
-                    # we want to make sure that a record is not exported multiple times.
-                    if cdm_recid in collection_cdm_recids:
-                        logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
-                    collection_cdm_recids.append(cdm_recid)
+                #     # After introducing querying sub_collections/sources,
+                #     # we want to make sure that a record is not exported multiple times.
+                #     if cdm_recid in collection_cdm_recids:
+                #         logger.warning("The record %s is expported in %s. Duplicate!" % (cdm_recid, alias))
+                #     collection_cdm_recids.append(cdm_recid)
 
-                    # Create the bib record with the contentDM record structure.
-                    record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
+                #     # Create the bib record with the contentDM record structure.
+                #     record, record_compound_file_metadata = get_bib_record(collection_alias, cdm_recid)
 
-                    # Save the compound file metadata in a separate JSON file.
-                    if record_compound_file_metadata:
-                        compound_file_metadata[cdm_recid] = record_compound_file_metadata
+                #     # Save the compound file metadata in a separate JSON file.
+                #     if record_compound_file_metadata:
+                #         compound_file_metadata[cdm_recid] = record_compound_file_metadata
 
-                    # Append the record to the collection
-                    collection.append(record)
-                    if LAST_REC != 0:
-                        if rec_num == LAST_REC:
-                            save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
+                #     # Append the record to the collection
+                #     collection.append(record)
+                #     if LAST_REC != 0:
+                #         if rec_num == LAST_REC:
+                #             save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
 
-                            # To get out of the while loop, make
-                            # processed_chunks higher than num_chunks.
-                            processed_chunks = num_chunks + 1
-                            break
+                #             # To get out of the while loop, make
+                #             # processed_chunks higher than num_chunks.
+                #             processed_chunks = num_chunks + 1
+                #             break
 
-                save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
+                # save_output_xml_to_file(collection, alias, i + 1, processed_chunks)
 
                 processed_chunks += 1
 
