@@ -471,11 +471,18 @@ def run_export_list_of_records():
 def run_batch():
     global rec_num
 
-    if ALIAS:
-        collection_aliases = [ALIAS]
-    else:
-        # Get the list of collections by their aliases.
-        collection_aliases = get_list_of_collection_aliases()
+    # if ALIAS:
+    #     collection_aliases = [ALIAS]
+    # else:
+    #     # Get the list of collections by their aliases.
+    #     collection_aliases = get_list_of_collection_aliases()
+    collection_aliases = ['p17218coll2',
+                          'p17218coll3',
+                          'p17218coll4',
+                          'p17218coll5',
+                          'p17218coll7',
+                          'p17218coll8',
+                          'p17218coll9']
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
 
