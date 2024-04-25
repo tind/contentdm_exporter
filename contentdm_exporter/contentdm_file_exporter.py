@@ -54,7 +54,7 @@ INPUT_FOLDER = REL_PATH + 'collections/'
 
 # Path to the output polder where the downloaded files will be stored.
 # OUTPUT_FOLDER = REL_PATH + "Download/"
-OUTPUT_FOLDER = "/home/upoad/data/USI/Downloads/"
+OUTPUT_FOLDER = "/home/upload/data/USI/Downloads/"
 
 
 def get_all_records_from_file(file_path):
@@ -124,13 +124,12 @@ if __name__ == '__main__':
     # Loop through all files in path, except DS_Store (MacOS specific files).
     input_path = Path(INPUT_FOLDER)
     for file_path in sorted(input_path.glob('**/*.xml')):
-        # print('Processing the file: ', file_path)
+        print('Processing the file: ', file_path)
         collection = get_all_records_from_file(file_path)
         # Loop through records
         files_to_download = []
-        for i, record in enumerate(collection):
+        for record in collection:
             all_files_in_record = []
-            # print(i)
             # Decide about local path to download files
             dmrecord = record.xpath('dmrecord')[0].text  # We could also have used cdmid
 
@@ -168,7 +167,7 @@ if __name__ == '__main__':
                             # this is a normal compound object
                             filename = str(pathinfo.name)
                             if filename in all_files_in_record:
-                                print('There are multiple files with the same file name on record: ', dmrecord)
+                                logger.warning("Record %s - The file name is duplicate! File name: %s" % (dmrecord, filename))
                             all_files_in_record.append(filename)
                             files_to_download.append((alias, page_id, output_path, filename))
 
@@ -181,8 +180,8 @@ if __name__ == '__main__':
                                 else:
                                     # this is a normal compound object
                                     filename = str(pathinfo.name)
-                                    if filename in files_to_download:
-                                        print('There are multiple files with the same file name on record: ', dmrecord)
+                                    if filename in all_files_in_record:
+                                        logger.warning("Record %s - The file name is duplicate! File name: %s" % (dmrecord, filename))
                                     all_files_in_record.append(filename)
                                     files_to_download.append((alias, page_id, output_path, filename))
 
@@ -195,8 +194,8 @@ if __name__ == '__main__':
                                         else:
                                             # this is a normal compound object
                                             filename = str(pathinfo.name)
-                                            if filename in files_to_download:
-                                                print('There are multiple files with the same file name on record: ', dmrecord)
+                                            if filename in all_files_in_record:
+                                                logger.warning("Record %s - The file name is duplicate! File name: %s" % (dmrecord, filename))
                                             all_files_in_record.append(filename)
                                             files_to_download.append((alias, page_id, output_path, filename))
 
