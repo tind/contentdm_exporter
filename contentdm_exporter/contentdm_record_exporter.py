@@ -25,15 +25,16 @@ compound object metadata and (optional) bibliographic metadata stored on the fil
 """
 
 import json
-import requests
+import logging
 import math
-from pathlib import Path
+import requests
+import urllib.parse
 from defusedxml.lxml import (tostring,
                              fromstring)
 from lxml.builder import E
-import logging
+from pathlib import Path
 from logger import setup_logger
-import urllib.parse
+
 
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
