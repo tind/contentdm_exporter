@@ -39,14 +39,14 @@ from logger import setup_logger
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = '17218'
+CDM_SERVER_NUMBER = '16135'
 # CDM_SERVER_NUMBER = '15999'
 
-CDM_WEBSITE_URL = 'https://digitalarchives.usi.edu/'
+CDM_WEBSITE_URL = 'https://utswlibrary.contentdm.oclc.org/'
 
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
-REL_PATH = "/home/ubuntu/migration/USI/da/"
+REL_PATH = "/home/ubuntu/migration/UTSW/"
 # REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Sales/BYU/"
 
 # Collection alias
@@ -61,18 +61,18 @@ ALIAS = ""
 # Example: [('p15999coll1', '8'), ('yellowstone', '2')]
 # To use this method, comment out the function run_batch()
 # and uncomment the function run_export_list_of_records().
-MANUAL_EXPORT_LIST = [
-    ('p15999coll3', '8'),
-    ('yellowstone', '5845'),
-    ('BYUPhotos', '687'),
-    ('GEA', '8131'),
-    ('Jackson', '3422'),
-    ('MStar', '6590'),
-    ('p15999coll20', '37296'),
-    ('p15999coll22', '6664'),
-    ('p15999coll24', '9632'),
-    ('WomansExp', '2399')
-]
+# MANUAL_EXPORT_LIST = [
+#     ('p15999coll3', '8'),
+#     ('yellowstone', '5845'),
+#     ('BYUPhotos', '687'),
+#     ('GEA', '8131'),
+#     ('Jackson', '3422'),
+#     ('MStar', '6590'),
+#     ('p15999coll20', '37296'),
+#     ('p15999coll22', '6664'),
+#     ('p15999coll24', '9632'),
+#     ('WomansExp', '2399')
+# ]
 
 #  Don't change CHUNK_SIZE unless CONTENTdm is timing out.
 CHUNK_SIZE = 100
@@ -472,18 +472,18 @@ def run_export_list_of_records():
 def run_batch():
     global rec_num
 
-    # if ALIAS:
-    #     collection_aliases = [ALIAS]
-    # else:
-    #     # Get the list of collections by their aliases.
-    #     collection_aliases = get_list_of_collection_aliases()
-    collection_aliases = ['p17218coll2',
-                          'p17218coll3',
-                          'p17218coll4',
-                          'p17218coll5',
-                          'p17218coll7',
-                          'p17218coll8',
-                          'p17218coll9']
+    if ALIAS:
+        collection_aliases = [ALIAS]
+    else:
+        # Get the list of collections by their aliases.
+        collection_aliases = get_list_of_collection_aliases()
+    # collection_aliases = ['p17218coll2',
+    #                       'p17218coll3',
+    #                       'p17218coll4',
+    #                       'p17218coll5',
+    #                       'p17218coll7',
+    #                       'p17218coll8',
+    #                       'p17218coll9']
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
 
