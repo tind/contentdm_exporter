@@ -36,25 +36,25 @@ from logger import setup_logger
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = '17218'
+CDM_SERVER_NUMBER = '16135'
 # CDM_SERVER_NUMBER = '15999'
 
 # The local path
 # REL_PATH = "/Users/Demo/migration/my_project/"
 # REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Sales/BYU/"
-REL_PATH = "/home/ubuntu/migration/USI/da/output/"
+REL_PATH = "/home/ubuntu/migration/UTSW/output/"
 
 # Other variables used by the script.
 # FILE_URL = 'https://cdm{}contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
 # FILE_URL = 'https://contentdm.lib.byu.edu/utils/getfile/collection/'
-FILE_URL = 'https://digitalarchives.usi.edu/utils/getfile/collection/'
+FILE_URL = 'https://utswlibrary.contentdm.oclc.org/utils/getfile/collection/'
 
 # Path to the folder where you'll find the input xml file(s).
 INPUT_FOLDER = REL_PATH + 'collections/'
 
 # Path to the output polder where the downloaded files will be stored.
-# OUTPUT_FOLDER = REL_PATH + "Download/"
-OUTPUT_FOLDER = "/home/upload/data/USI/Downloads/"
+OUTPUT_FOLDER = REL_PATH + "Download/"
+# OUTPUT_FOLDER = "/home/upload/data/UTSW/Downloads/"
 
 
 def get_all_records_from_file(file_path):
