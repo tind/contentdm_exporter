@@ -386,7 +386,7 @@ def get_bib_record(collection_alias, cdm_recid):
                         if pagemetadata_json:
                             record_compound_file_metadata[file_level_id] = pagemetadata_json
 
-                if elem.tag == 'node':
+                elif elem.tag == 'node':
                     for sub_elem in elem:
                         if sub_elem.tag == 'page':
                             # Get the file level id
@@ -395,7 +395,7 @@ def get_bib_record(collection_alias, cdm_recid):
                             pagemetadata_xml = get_file_metadata_xml(file_level_id, collection_alias)
                             if len(pagemetadata_xml) > 0:
                                 # Append the page metadata to the page element.
-                                elem.append(pagemetadata_xml)
+                                sub_elem.append(pagemetadata_xml)
 
                             if EXPORT_PAGE_METADATA_JSON:
                                 # Get the page/file_metadata in JSON and export to a separate file
@@ -411,7 +411,7 @@ def get_bib_record(collection_alias, cdm_recid):
                                     pagemetadata_xml = get_file_metadata_xml(file_level_id, collection_alias)
                                     if len(pagemetadata_xml) > 0:
                                         # Append the page metadata to the page element.
-                                        elem.append(pagemetadata_xml)
+                                        sub_sub_elem.append(pagemetadata_xml)
 
                                     if EXPORT_PAGE_METADATA_JSON:
                                         # Get the page/file_metadata in JSON and export to a separate file
