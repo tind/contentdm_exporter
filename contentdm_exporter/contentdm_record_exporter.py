@@ -632,7 +632,7 @@ def run_batch():
                     f.write(json.dumps(results))
 
                 # We are preparing the "start_at" number we will use in the next chunk.
-                start_at = CHUNK_SIZE * processed_chunks + 1
+                start_at = CHUNK_SIZE * processed_chunks + START_AT
 
                 # Loop through each record in the processed chunk.
                 for results_record in results['records']:
