@@ -39,14 +39,17 @@ from logger import setup_logger
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = '16135'
+CDM_SERVER_NUMBER = '16923'
+# CDM_SERVER_NUMBER = '16135'
 # CDM_SERVER_NUMBER = '15999'
 
-CDM_WEBSITE_URL = 'https://utswlibrary.contentdm.oclc.org/'
+# CDM_WEBSITE_URL = 'https://utswlibrary.contentdm.oclc.org/'
+CDM_WEBSITE_URL = 'https://societyofthecincinnati.contentdm.oclc.org/'
 
 # Local path to save file
 # REL_PATH = "/Users/Demo/migration/my_project/"
-REL_PATH = "/home/ubuntu/migration/UTSW/"
+REL_PATH = "/home/ubuntu/migration/cincinnati/"
+# REL_PATH = "/home/ubuntu/migration/UTSW/"
 # REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Sales/BYU/"
 
 # Collection alias
