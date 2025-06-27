@@ -36,18 +36,23 @@ from logger import setup_logger
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = '16135'
+CDM_SERVER_NUMBER = '16923'
+# CDM_SERVER_NUMBER = '16135'
 # CDM_SERVER_NUMBER = '15999'
+
+CDM_WEBSITE_URL = 'https://societyofthecincinnati.contentdm.oclc.org/'
 
 # The local path
 # REL_PATH = "/Users/Demo/migration/my_project/"
 # REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Sales/BYU/"
-REL_PATH = "/home/ubuntu/migration/UTSW/output/"
+REL_PATH = "/home/ubuntu/migration/cincinnati/"
 
 # Other variables used by the script.
 # FILE_URL = 'https://cdm{}contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
 # FILE_URL = 'https://contentdm.lib.byu.edu/utils/getfile/collection/'
-FILE_URL = 'https://utswlibrary.contentdm.oclc.org/utils/getfile/collection/'
+# FILE_URL = 'https://utswlibrary.contentdm.oclc.org/utils/getfile/collection/'
+
+FILE_URL = CDM_WEBSITE_URL + 'utils/getfile/collection/'
 
 # Path to the folder where you'll find the input xml file(s).
 INPUT_FOLDER = REL_PATH + 'collections/'
