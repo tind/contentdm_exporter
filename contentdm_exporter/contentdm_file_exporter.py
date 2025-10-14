@@ -45,7 +45,7 @@ CDM_WEBSITE_URL = 'https://societyofthecincinnati.contentdm.oclc.org/'
 # The local path
 # REL_PATH = "/Users/Demo/migration/my_project/"
 # REL_PATH = "/Users/kennethhole/TIND Implementation Dropbox/Sales/BYU/"
-REL_PATH = "/home/ubuntu/migration/cincinnati/"
+REL_PATH = "/home/ubuntu/migration/cincinnati/output/"
 
 # Other variables used by the script.
 # FILE_URL = 'https://cdm{}contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
