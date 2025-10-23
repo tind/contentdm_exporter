@@ -86,17 +86,6 @@ def download_file(alias, page_id, output_path, filename):
                     "Download failed for the URL: %s. Status Code: %s. Message: %s"
                     % (download_url, file_response.status_code, file_response.text)
                 )
-            # req = requests.get(download_url, timeout=3600)
-            # if len(req.content) < 1000:
-            #     if req.text == 'Requested item not found':
-            #         print('File does not exists. Record: ', page_id)
-            #         return 'Requested item not found'
-            # if req.status_code == 200:
-            #     with open(str(local_file_name), 'wb') as f:
-            #         f.write(req.content)
-            #     return True
-            # else:
-            #     return False
         except requests.exceptions.Timeout as e:
             logger.warning(
                 "Download failed for the URL: %s. Error: %s" % (download_url, e)
