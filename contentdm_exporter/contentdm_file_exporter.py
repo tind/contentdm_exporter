@@ -41,7 +41,9 @@ CDM_SERVER_NUMBER = "16923"
 CDM_WEBSITE_URL = "https://societyofthecincinnati.contentdm.oclc.org/"
 
 # The local path
-REL_PATH = "/Users/Demo/migration/my_project/"
+REL_PATH = (
+    "/Users/kennethhole/TIND Implementation Dropbox/OIT/migration/CONTENTdm_export/"
+)
 
 FILE_URL = CDM_WEBSITE_URL + "utils/getfile/collection/"
 # The file URL can also be found on the format:
@@ -73,7 +75,6 @@ def download_file(alias, page_id, output_path, filename):
     if not local_file_name.is_file():
         download_url = FILE_URL + alias + "/id/" + page_id + "/filename/" + filename
         # Download file
-        print(download_url)
         try:
             # Get result from url and write to file:
             file_response = requests.get(download_url, stream=True)
