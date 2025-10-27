@@ -24,23 +24,35 @@ This script loops through the input XML and find all files. It then query CONTEN
 the files.
 """
 
+import logging
+import multiprocessing
 import requests
-from pathlib import Path
+import shutil
 from defusedxml.lxml import parse
+from pathlib import Path
+
+from logger import setup_logger
 
 # Settings
-FILE_URL = 'https://cdm16694.contentdm.oclc.org/utils/getfile/collection/'
+# You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
+# or https://mycontentdmsite.com/utils/diagnostics.
+CDM_SERVER_NUMBER = "16923"
 
-ALIAS = ""
+CDM_WEBSITE_URL = "https://societyofthecincinnati.contentdm.oclc.org/"
 
 # The local path
 REL_PATH = "/Users/Demo/migration/my_project/"
 
-# Path to the folder where you'll find the input xml file(s).
-MIG_INPUT_FOLDER = REL_PATH + 'output/'
+FILE_URL = CDM_WEBSITE_URL + "utils/getfile/collection/"
+# The file URL can also be found on the format:
+# FILE_URL = 'https://cdm{}contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
 
-# Path to the output polder where the downloaded files will be stored.
-MIG_OUTPUT_FOLDER = REL_PATH + "Download/"
+# Path to the folder where you'll find the input xml file(s) that was downloaded with contentdm_record_exporter.
+INPUT_FOLDER = REL_PATH + "collections/"
+
+# Path to the output folder where the downloaded files will be stored.
+OUTPUT_FOLDER = REL_PATH + "Download/"
+# OUTPUT_FOLDER = "/home/upload/data/UTSW/Downloads/"
 
 
 def get_all_records_from_file(file_path):
@@ -49,7 +61,7 @@ def get_all_records_from_file(file_path):
     return collection
 
 
-def download_file(dmrecord, output_path, filename):
+def download_file(alias, page_id, output_path, filename):
     """
     Export file from CONTENTdm
     filename is the parameter in the CONTENTdm query which defines the local file
@@ -59,138 +71,159 @@ def download_file(dmrecord, output_path, filename):
 
     # If the file already exists, skip downloading it again.
     if not local_file_name.is_file():
-        download_url = FILE_URL + ALIAS + '/id/' + dmrecord + '/filename/' + filename
+        download_url = FILE_URL + alias + "/id/" + page_id + "/filename/" + filename
         # Download file
+        print(download_url)
         try:
-            req = requests.get(download_url, timeout=3600)
-            if len(req.content) < 1000:
-                if req.text == 'Requested item not found':
-                    print('File does not exists. Record: ', dmrecord)
-                    return 'Requested item not found'
-            if req.status_code == 200:
-                with open(str(local_file_name), 'wb') as f:
-                    f.write(req.content)
+            # Get result from url and write to file:
+            file_response = requests.get(download_url, stream=True)
+            if file_response.status_code == 200:
+                with open(local_file_name, "wb") as output_file:
+                    shutil.copyfileobj(file_response.raw, output_file)
                 return True
             else:
-                return False
+                logger.warning(
+                    "Download failed for the URL: %s. Status Code: %s. Message: %s"
+                    % (download_url, file_response.status_code, file_response.text)
+                )
         except requests.exceptions.Timeout as e:
-            print('File download timeout: ', e)
+            logger.warning(
+                "Download failed for the URL: %s. Error: %s" % (download_url, e)
+            )
             return e
-        return False
     else:
         # TIND specific usage as we import the function from another script.
-        return 'local'
+        return "local"
 
 
 def get_page_info(elem):
     has_pdfpage = False
-    page_recid = ''
+    page_id = ""
     pathinfo = None
     for sub_elem in elem:
-        if sub_elem.tag == 'pagefile':
-            if sub_elem.text.endswith('.pdfpage'):
+        if sub_elem.tag == "pagefile":
+            if sub_elem.text.endswith(".pdfpage"):
                 has_pdfpage = True
-            else:
-                pathinfo = Path(sub_elem.text)
-        elif sub_elem.tag == 'pageptr':
-            page_recid = sub_elem.text
-    return has_pdfpage, page_recid, pathinfo
+            pathinfo = Path(sub_elem.text)
+        elif sub_elem.tag == "pageptr":
+            page_id = sub_elem.text
+    return has_pdfpage, page_id, pathinfo
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    logger = setup_logger(str(Path(OUTPUT_FOLDER, "file_export.log")), "file_export")
+    logger = logging.getLogger("file_export")
     # Loop through all files in path, except DS_Store (MacOS specific files).
-    input_folder = Path(MIG_INPUT_FOLDER)
-    for file_path in sorted(input_folder.glob('*.xml')):
-
+    input_path = Path(INPUT_FOLDER)
+    for file_path in sorted(input_path.glob("**/*.xml")):
+        print("Processing the file: ", file_path)
         collection = get_all_records_from_file(file_path)
         # Loop through records
-        for i, record in enumerate(collection):
-            print(i)
+        files_to_download = []
+        for record in collection:
+            all_files_in_record = []
             # Decide about local path to download files
-            dmrecord = record.xpath('dmrecord')[0].text  # We could also have used cdmid
+            dmrecord = record.xpath("dmrecord")[0].text  # We could also have used cdmid
 
-            output_path = Path(MIG_OUTPUT_FOLDER)
+            alias = record.xpath("cdmalias")[0].text
+
+            output_path = Path(OUTPUT_FOLDER)
             if not output_path.is_dir():
                 output_path.mkdir()
 
-            output_path = Path(MIG_OUTPUT_FOLDER, ALIAS)
+            output_path = Path(OUTPUT_FOLDER, alias)
             if not output_path.is_dir():
                 output_path.mkdir()
-            output_path = Path(output_path, '{:06}'.format(int(dmrecord)))
+            output_path = Path(output_path, dmrecord)
             if not output_path.is_dir():
                 output_path.mkdir()
 
             # Check if the record has an element "structure" with children
-            structures = record.xpath('structure')
+            structures = record.xpath("structure")
             if structures and len(structures[0]) > 0:
                 download_pdf = False
                 # First, let's check that it is only one element in structure
                 if len(structures) > 1:
-                    print('We have multiple structure elements! ', dmrecord)
+                    print("We have multiple structure elements! ", dmrecord)
 
                 # We have children
                 # if this is a pdf compound object with '.pdfpage' children we need to handle
                 # things differently
                 j = 1
                 for elem in structures[0]:
-                    if elem.tag == 'page':
-                        has_pdfpage, page_recid, pathinfo = get_page_info(elem)
+                    if elem.tag == "page":
+                        has_pdfpage, page_id, pathinfo = get_page_info(elem)
                         if has_pdfpage:
                             download_pdf = True
                         else:
                             # this is a normal compound object
-                            filename = '{:06}_{:06}{}'.format(int(dmrecord),
-                                                              j,
-                                                              pathinfo.suffix)
+                            filename = str(pathinfo.name)
+                            if filename in all_files_in_record:
+                                logger.warning(
+                                    "Record %s - The file name is duplicate! File name: %s"
+                                    % (dmrecord, filename)
+                                )
+                            all_files_in_record.append(filename)
+                            files_to_download.append(
+                                (alias, page_id, output_path, filename)
+                            )
 
-                            download_file(page_recid, output_path, filename)
-                            j += 1
-
-                    if elem.tag == 'node':
+                    elif elem.tag == "node":
                         for sub_elem in elem:
-                            if sub_elem.tag == 'page':
-                                has_pdfpage, page_recid, pathinfo = get_page_info(sub_elem)
+                            if sub_elem.tag == "page":
+                                has_pdfpage, page_id, pathinfo = get_page_info(sub_elem)
                                 if has_pdfpage:
                                     download_pdf = True
                                 else:
                                     # this is a normal compound object
-                                    filename = '{:06}_{:06}{}'.format(int(page_recid),
-                                                                      j,
-                                                                      pathinfo.suffix)
+                                    filename = str(pathinfo.name)
+                                    if filename in all_files_in_record:
+                                        logger.warning(
+                                            "Record %s - The file name is duplicate! File name: %s"
+                                            % (dmrecord, filename)
+                                        )
+                                    all_files_in_record.append(filename)
+                                    files_to_download.append(
+                                        (alias, page_id, output_path, filename)
+                                    )
 
-                                    download_file(page_recid, output_path, filename)
-                                    j += 1
-                            if sub_elem.tag == 'node':
+                            elif sub_elem.tag == "node":
                                 for sub_sub_elem in sub_elem:
-                                    if sub_sub_elem.tag == 'page':
-                                        has_pdfpage, page_recid, pathinfo = get_page_info(sub_sub_elem)
+                                    if sub_sub_elem.tag == "page":
+                                        has_pdfpage, page_id, pathinfo = get_page_info(
+                                            sub_sub_elem
+                                        )
                                         if has_pdfpage:
                                             download_pdf = True
                                         else:
                                             # this is a normal compound object
-                                            filename = '{:06}_{:06}{}'.format(int(dmrecord),
-                                                                              j,
-                                                                              pathinfo.suffix)
-
-                                            download_file(page_recid, output_path, filename)
-                                            j += 1
+                                            filename = str(pathinfo.name)
+                                            if filename in all_files_in_record:
+                                                logger.warning(
+                                                    "Record %s - The file name is duplicate! File name: %s"
+                                                    % (dmrecord, filename)
+                                                )
+                                            all_files_in_record.append(filename)
+                                            files_to_download.append(
+                                                (alias, page_id, output_path, filename)
+                                            )
 
                 if download_pdf:
                     # use the parent dmrecord to get the full pdf
-                    filename = '{:06}_{:06}{}'.format(int(dmrecord),
-                                                      1,
-                                                      '.pdf')
+                    filename = "{:06}_{:06}{}".format(int(dmrecord), 1, ".pdf")
 
-                    download_file(dmrecord, output_path, filename)
+                    files_to_download.append((alias, dmrecord, output_path, filename))
 
             else:
                 # This is a single item
-                pathinfo = Path(record.xpath('find')[0].text)
+                filename = record.xpath("find")[0].text
 
-                extension = pathinfo.suffix
+                files_to_download.append((alias, dmrecord, output_path, filename))
 
-                filename = '{:06}_{:06}{}'.format(int(dmrecord),
-                                                  1,
-                                                  extension)
+        if files_to_download:
 
-                download_file(dmrecord, output_path, filename)
+            pool = multiprocessing.Pool(processes=4)
+
+            results = pool.starmap(download_file, files_to_download)
+            pool.close()
+            pool.join()
