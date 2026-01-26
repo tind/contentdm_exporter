@@ -149,10 +149,10 @@ def get_list_of_collection_aliases():
 
 # Copied over from migration_formatter/vendord_da/content_dm/file_utils_content_dm.py
 # Creates mapping table of element tags to labels by collection
-def create_current_mapping_table(collecton_aliases):
+def create_current_mapping_table(collection_aliases):
     aliases_fields = {}
 
-    for alias in collecton_aliases:
+    for alias in collection_aliases:
 
         query_url = "{main_url}dmGetCollectionFieldInfo/{alias}/{format}".format(
             main_url=MAIN_URL, alias=alias, format="json"
@@ -338,11 +338,13 @@ def get_file_level_id(elem):
     return file_level_id
 
 
-def get_file_metadata_xml(file_level_id, collection_alias, field_mapping={}):
+def get_file_metadata_xml(file_level_id, collection_alias, field_mapping=None):
     pagemetadata = E.pagemetadata()
     if file_level_id is None:
         return pagemetadata
     
+    if field_mapping is None:
+        field_mapping = {}
     field_mapping_alias = field_mapping.get(collection_alias, {})
 
     # Add file metadata inside the compound object.
@@ -376,7 +378,7 @@ def get_file_metadata_json(file_level_id, collection_alias):
     return file_metadata
 
 
-def get_bib_record(collection_alias, cdm_recid, field_mapping={}):
+def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     # Create a new xml record object.
     record = E.record()
 
@@ -393,6 +395,8 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping={}):
     # Get bibliographic record metadata
     bib_info = get_item_info(collection_alias, cdm_recid, format="xml")
 
+    if field_mapping is None:
+        field_mapping = {}
     field_mapping_alias = field_mapping.get(collection_alias, {})
 
     # Append each field to the new record object.
