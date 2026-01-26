@@ -45,6 +45,7 @@ CDM_WEBSITE_URL = "https://societyofthecincinnati.contentdm.oclc.org/"
 # Local path to save file
 REL_PATH = "/Users/Demo/migration/my_project/"
 
+
 # Collection alias
 # If set to empty, the script will get the full list of collections and loop through all of them.
 # Only set this variable if you plan to export a single collection.
@@ -145,6 +146,41 @@ def get_list_of_collection_aliases():
 
     # Create a list of aliases. Remove first letter which is a slash.
     return sorted([collection.get("alias")[1:] for collection in items])
+
+# Copied over from migration_formatter/vendord_da/content_dm/file_utils_content_dm.py
+# Creates mapping table of element tags to labels by collection
+def create_current_mapping_table(collection_aliases):
+    aliases_fields = {}
+
+    for alias in collection_aliases:
+
+        query_url = "{main_url}dmGetCollectionFieldInfo/{alias}/{format}".format(
+            main_url=MAIN_URL, alias=alias, format="json"
+        )
+
+        # Query CONTENTdm and return records; if failure, log problem.
+        try:
+            req = requests.get(query_url)
+            fields = json.loads(req.content)
+        except Exception as E:
+            logger.warning("Failed to get fields for alias %s: %s" % (alias, E))
+            fields = {}
+            pass
+
+        aliases_fields[alias] = fields
+
+    # First, get all names used in all collections
+    current_mapping = {}
+    for alias, fields in aliases_fields.items():
+        alias_mapping = {}
+        for field in fields:
+            alias_mapping[field.get("nick")] = field.get("name")
+        current_mapping[alias] = alias_mapping
+
+    with open(f'{REL_PATH}/field_mapping.json', 'w') as f:
+        json.dump(current_mapping, f)
+
+    return current_mapping
 
 
 def query_contentdm(query_map):
@@ -302,10 +338,14 @@ def get_file_level_id(elem):
     return file_level_id
 
 
-def get_file_metadata_xml(file_level_id, collection_alias):
+def get_file_metadata_xml(file_level_id, collection_alias, field_mapping=None):
     pagemetadata = E.pagemetadata()
     if file_level_id is None:
         return pagemetadata
+    
+    if field_mapping is None:
+        field_mapping = {}
+    field_mapping_alias = field_mapping.get(collection_alias, {})
 
     # Add file metadata inside the compound object.
     # Use file_level_id (pageptr)) as the key.
@@ -315,6 +355,9 @@ def get_file_metadata_xml(file_level_id, collection_alias):
     pagemetadata = E.pagemetadata()
     for field in file_level_xml:
         if field.text or len(field) > 0:
+            field_name = field_mapping_alias.get(field.tag)
+            if field_name:
+                field.set('label', field_name)
             pagemetadata.append(field)
 
     return pagemetadata
@@ -335,7 +378,7 @@ def get_file_metadata_json(file_level_id, collection_alias):
     return file_metadata
 
 
-def get_bib_record(collection_alias, cdm_recid):
+def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     # Create a new xml record object.
     record = E.record()
 
@@ -352,9 +395,16 @@ def get_bib_record(collection_alias, cdm_recid):
     # Get bibliographic record metadata
     bib_info = get_item_info(collection_alias, cdm_recid, format="xml")
 
+    if field_mapping is None:
+        field_mapping = {}
+    field_mapping_alias = field_mapping.get(collection_alias, {})
+
     # Append each field to the new record object.
     bib_xml = fromstring(bib_info)
     for field in bib_xml:
+        field_name = field_mapping_alias.get(field.tag)
+        if field_name:
+            field.set('label', field_name)
         record.append(field)
 
     # Get the records compound information.
@@ -382,7 +432,7 @@ def get_bib_record(collection_alias, cdm_recid):
                     file_level_id = get_file_level_id(elem)
                     # Get the page/file metadata
                     pagemetadata_xml = get_file_metadata_xml(
-                        file_level_id, collection_alias
+                        file_level_id, collection_alias, field_mapping
                     )
                     if len(pagemetadata_xml) > 0:
                         # Append the page metadata to the page element.
@@ -405,7 +455,7 @@ def get_bib_record(collection_alias, cdm_recid):
                             file_level_id = get_file_level_id(sub_elem)
                             # Get the page/file metadata
                             pagemetadata_xml = get_file_metadata_xml(
-                                file_level_id, collection_alias
+                                file_level_id, collection_alias, field_mapping
                             )
                             if len(pagemetadata_xml) > 0:
                                 # Append the page metadata to the page element.
@@ -427,7 +477,8 @@ def get_bib_record(collection_alias, cdm_recid):
                                     file_level_id = get_file_level_id(sub_sub_elem)
                                     # Get the page/file metadata
                                     pagemetadata_xml = get_file_metadata_xml(
-                                        file_level_id, collection_alias
+                                        file_level_id, collection_alias,
+                                        field_mapping
                                     )
                                     if len(pagemetadata_xml) > 0:
                                         # Append the page metadata to the page element.
@@ -512,6 +563,8 @@ def run_batch():
     #                       'p17218coll9']
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
+
+    field_mapping = create_current_mapping_table(collection_aliases)
 
     for alias in collection_aliases:
 
@@ -728,7 +781,7 @@ def run_batch():
 
                     # Create the bib record with the contentDM record structure.
                     record, record_compound_file_metadata = get_bib_record(
-                        collection_alias, cdm_recid
+                        collection_alias, cdm_recid, field_mapping
                     )
 
                     # Save the compound file metadata in a separate JSON file.
