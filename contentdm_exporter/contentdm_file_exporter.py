@@ -33,15 +33,11 @@ from pathlib import Path
 
 from logger import setup_logger
 
-# Settings
-# You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
-# or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = "16923"
-
-CDM_WEBSITE_URL = "https://societyofthecincinnati.contentdm.oclc.org/"
-
-# The local path
-REL_PATH = "/Users/Demo/migration/my_project/"
+from contentdm_exporter.settings import (
+    CDM_SERVER_NUMBER,
+    CDM_WEBSITE_URL,
+    REL_PATH
+)
 
 FILE_URL = CDM_WEBSITE_URL + "utils/getfile/collection/"
 # The file URL can also be found on the format:
