@@ -36,22 +36,22 @@ from logger import setup_logger
 # Settings
 # You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
 # or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = "16923"
+CDM_SERVER_NUMBER = "17267"
 
 CDM_WEBSITE_URL = "https://societyofthecincinnati.contentdm.oclc.org/"
 
 # The local path
-REL_PATH = "/Users/Demo/migration/my_project/"
+REL_PATH = "/Users/amyruskin/Data/OIT/migration/01_bibs/input/"
 
-FILE_URL = CDM_WEBSITE_URL + "utils/getfile/collection/"
+#FILE_URL = CDM_WEBSITE_URL + "utils/getfile/collection/"
 # The file URL can also be found on the format:
-# FILE_URL = 'https://cdm{}contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
+FILE_URL = 'https://cdm{}.contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
 
 # Path to the folder where you'll find the input xml file(s) that was downloaded with contentdm_record_exporter.
-INPUT_FOLDER = REL_PATH + "collections/"
+INPUT_FOLDER = REL_PATH + "collections/da"
 
 # Path to the output folder where the downloaded files will be stored.
-OUTPUT_FOLDER = REL_PATH + "Download/"
+OUTPUT_FOLDER = REL_PATH + "files/da"
 # OUTPUT_FOLDER = "/home/upload/data/UTSW/Downloads/"
 
 
@@ -123,7 +123,9 @@ if __name__ == "__main__":
         for record in collection:
             all_files_in_record = []
             # Decide about local path to download files
-            dmrecord = record.xpath("dmrecord")[0].text  # We could also have used cdmid
+            # Use cdmid - in cases where you get a "requested item not found" error message,
+            # there will still be a cdmid, but no dmrecord
+            dmrecord = record.xpath("cdmid")[0].text
 
             alias = record.xpath("cdmalias")[0].text
 
@@ -216,9 +218,10 @@ if __name__ == "__main__":
 
             else:
                 # This is a single item
-                filename = record.xpath("find")[0].text
-
-                files_to_download.append((alias, dmrecord, output_path, filename))
+                find = record.xpath("find")
+                if find:
+                    filename = find[0].text
+                    files_to_download.append((alias, dmrecord, output_path, filename))
 
         if files_to_download:
 
