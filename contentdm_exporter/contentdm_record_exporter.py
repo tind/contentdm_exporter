@@ -35,7 +35,7 @@ from pathlib import Path
 from logger import setup_logger
 
 
-from contentdm_exporter.settings import (
+from settings import (
     CDM_SERVER_NUMBER,
     CDM_WEBSITE_URL,
     REL_PATH,
