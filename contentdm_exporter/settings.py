@@ -1,13 +1,16 @@
-# Settings
-# You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
-# or https://mycontentdmsite.com/utils/diagnostics.
-CDM_SERVER_NUMBER = "16923"
+"""
+Settings specific to CDM instance and run, pulled in by file and record exporter scripts
+"""
 
-CDM_WEBSITE_URL = "https://societyofthecincinnati.contentdm.oclc.org/"
+# You can use the following URL to find the server number:
+# https://mycontentdmsite.com/digital/api/diagnostics
+# or https://mycontentdmsite.com/utils/diagnostics.
+CDM_SERVER_NUMBER = "15821"
+
+CDM_WEBSITE_URL = "https://digitalcollections.vmi.edu/digital/"
 
 # Local path to save file
-REL_PATH = "/Users/Demo/migration/my_project/"
-
+REL_PATH = "/Users/amyruskin/Data/vmi/migration/01_bibs/input/"
 
 # Collection alias
 # If set to empty, the script will get the full list of collections and loop through all of them.

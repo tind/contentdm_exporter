@@ -26,11 +26,12 @@ def setup_logger(logger_file, logger_name):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
 
-    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s',
-                                       '%Y-%m-%d  %H:%M:%S')
-    stream_formatter = logging.Formatter('%(levelname)s - %(message)s')
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s", "%Y-%m-%d  %H:%M:%S"
+    )
+    stream_formatter = logging.Formatter("%(levelname)s - %(message)s")
 
-    file_handler = logging.FileHandler(logger_file, 'w')
+    file_handler = logging.FileHandler(logger_file, "w")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)

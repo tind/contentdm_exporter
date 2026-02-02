@@ -29,24 +29,74 @@ import logging
 import math
 import requests
 import urllib.parse
-from defusedxml.lxml import tostring, fromstring
+
+# from defusedxml.lxml import tostring, fromstring
 from lxml.builder import E
+from lxml.etree import tostring, fromstring, XMLParser
 from pathlib import Path
 from logger import setup_logger
 
+# Settings
+# You can use the following URL to find the server number: https://mycontentdmsite.com/digital/api/diagnostics
+# or https://mycontentdmsite.com/utils/diagnostics.
+CDM_SERVER_NUMBER = "15821"
 
-from settings import (
-    CDM_SERVER_NUMBER,
-    CDM_WEBSITE_URL,
-    REL_PATH,
-    ALIAS,
-    MANUAL_EXPORT_LIST,
-    CHUNK_SIZE,
-    START_AT,
-    LAST_REC,
-    EXPORT_PAGE_METADATA,
-    EXPORT_PAGE_METADATA_JSON,
-)
+CDM_WEBSITE_URL = "https://digitalcollections.vmi.edu/digital/"
+
+# Local path to save file
+REL_PATH = "/Users/amyruskin/Data/vmi/migration/01_bibs/"
+
+# Collection alias
+# If set to empty, the script will get the full list of collections and loop through all of them.
+# Only set this variable if you plan to export a single collection.
+# Used mainly for testing purposes. Example: ALIAS = "p17218coll3"
+ALIAS = ""
+
+# ALIAS_LIST = []
+
+ALIAS_LIST = [
+    "p15821coll9",  # errored out? at Record number 501, p15821coll9/4
+]
+
+# Use the config below if you want to export particular records from different collections.
+# The format is a list of tuples with collection name and record IDs.
+# Example: [('p15999coll1', '8'), ('yellowstone', '2')]
+# To use this method, comment out the function run_batch()
+# and uncomment the function run_export_list_of_records().
+# MANUAL_EXPORT_LIST = [
+#     ('p15999coll3', '8'),
+#     ('yellowstone', '5845'),
+#     ('BYUPhotos', '687'),
+#     ('GEA', '8131'),
+#     ('Jackson', '3422'),
+#     ('MStar', '6590'),
+#     ('p15999coll20', '37296'),
+#     ('p15999coll22', '6664'),
+#     ('p15999coll24', '9632'),
+#     ('WomansExp', '2399')
+# ]
+
+#  Don't change CHUNK_SIZE unless CONTENTdm is timing out.
+CHUNK_SIZE = 100
+
+# Don't change $start_at from 1 unless you are exporting a range of records. If you
+# want to export a range, use the number of the first record in the range.
+START_AT = 1
+# START_AT = 2501
+
+# The last record in subset, not the entire record set. Don't change LAST_REC from 0
+# unless you are exporting a subset of records. If you want to export a range, use the
+# number of records in the subset, e.g., if you want to export 200 records, use that value.
+LAST_REC = 0
+
+# Do we like to export the page metadata?
+# Exporting the page metadata will increase the time to do the export.
+EXPORT_PAGE_METADATA = True
+
+# Do we like to export the page metadata in JSON?
+# This will be in addition to exporting the page metadata in XML.
+# EXPORT_PAGE_METADATA need to be set to 'True' to be able to export page metadata at all.
+EXPORT_PAGE_METADATA_JSON = False
 
 # Other variables used by the script.
 # URL to the CONTENTdm web services API.
@@ -56,6 +106,7 @@ MAIN_URL = "https://server{}.contentdm.oclc.org/dmwebservices/index.php?q=".form
 
 # Path to the output folder where you'll find the final xml file
 OUTPUT_FOLDER = REL_PATH + "output/"
+
 
 # Create output folder if it does not exists.
 output_path = Path(OUTPUT_FOLDER)
@@ -105,11 +156,10 @@ def get_list_of_collection_aliases():
 
 
 # Copied over from migration_formatter/vendord_da/content_dm/file_utils_content_dm.py
-# Creates mapping table of element tags to labels by collection
-def create_current_mapping_table(collection_aliases):
+def create_current_mapping_table(collecton_aliases):
     aliases_fields = {}
 
-    for alias in collection_aliases:
+    for alias in collecton_aliases:
 
         query_url = "{main_url}dmGetCollectionFieldInfo/{alias}/{format}".format(
             main_url=MAIN_URL, alias=alias, format="json"
@@ -300,22 +350,29 @@ def get_file_metadata_xml(file_level_id, collection_alias, field_mapping=None):
     if file_level_id is None:
         return pagemetadata
 
-    if field_mapping is None:
-        field_mapping = {}
-    field_mapping_alias = field_mapping.get(collection_alias, {})
+    if field_mapping is not None:
+        field_mapping_alias = field_mapping.get(collection_alias, {})
 
     # Add file metadata inside the compound object.
     # Use file_level_id (pageptr)) as the key.
     file_level_info = get_item_info(collection_alias, file_level_id, format="xml")
-    file_level_xml = fromstring(file_level_info)
-    # Strip away empty fields.
-    pagemetadata = E.pagemetadata()
-    for field in file_level_xml:
-        if field.text or len(field) > 0:
-            field_name = field_mapping_alias.get(field.tag)
-            if field_name:
-                field.set("label", field_name)
-            pagemetadata.append(field)
+    try:
+        file_level_xml = fromstring(file_level_info)
+        # Strip away empty fields.
+        for field in file_level_xml:
+            # Remove full text to make files more manageable - can download this as a separate process
+            if field.tag == "full" and field.text:
+                field.text = "[FULL TEXT OMITTED]"
+            if field.text or len(field) > 0:
+                if field_mapping is not None:
+                    field_name = field_mapping_alias.get(field.tag)
+                    if field_name:
+                        field.set("label", field_name)
+                pagemetadata.append(field)
+    except Exception:
+        logger.warning(
+            f"Issue processing record within compound object: {collection_alias}/{file_level_id}"
+        )
 
     return pagemetadata
 
@@ -352,16 +409,22 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     # Get bibliographic record metadata
     bib_info = get_item_info(collection_alias, cdm_recid, format="xml")
 
-    if field_mapping is None:
-        field_mapping = {}
-    field_mapping_alias = field_mapping.get(collection_alias, {})
+    if field_mapping is not None:
+        field_mapping_alias = field_mapping.get(collection_alias, {})
 
     # Append each field to the new record object.
-    bib_xml = fromstring(bib_info)
+    try:
+        bib_xml = fromstring(bib_info)
+    except Exception:
+        bib_xml = fromstring(bib_info.encode("utf-8"))
     for field in bib_xml:
-        field_name = field_mapping_alias.get(field.tag)
-        if field_name:
-            field.set("label", field_name)
+        # Remove full text to make files more manageable - can download this as a separate process
+        if field.tag == "full" and field.text:
+            field.text = "[FULL TEXT OMITTED]"
+        if field_mapping is not None:
+            field_name = field_mapping_alias.get(field.tag)
+            if field_name:
+                field.set("label", field_name)
         record.append(field)
 
     # Get the records compound information.
@@ -507,6 +570,8 @@ def run_batch():
 
     if ALIAS:
         collection_aliases = [ALIAS]
+    elif len(ALIAS_LIST) > 0:
+        collection_aliases = ALIAS_LIST
     else:
         # Get the list of collections by their aliases.
         collection_aliases = get_list_of_collection_aliases()
@@ -520,7 +585,7 @@ def run_batch():
 
     logger.info("The following collections were found: %s" % (collection_aliases,))
 
-    field_mapping = create_current_mapping_table(collection_aliases)
+    current_mapping = create_current_mapping_table(collection_aliases)
 
     for alias in collection_aliases:
 
@@ -713,7 +778,6 @@ def run_batch():
                 # Loop through each record in the processed chunk.
                 for results_record in results["records"]:
                     rec_num += 1
-                    print(rec_num)
 
                     if results_record["parentobject"] != -1:
                         logger.warning(
@@ -725,6 +789,7 @@ def run_batch():
                     if collection_alias.startswith("/"):
                         collection_alias = collection_alias[1:]
                     cdm_recid = str(results_record["pointer"])
+                    print(f"Record number {rec_num}, {collection_alias}/{cdm_recid}")
 
                     # After introducing querying sub_collections/sources,
                     # we want to make sure that a record is not exported multiple times.
@@ -737,7 +802,7 @@ def run_batch():
 
                     # Create the bib record with the contentDM record structure.
                     record, record_compound_file_metadata = get_bib_record(
-                        collection_alias, cdm_recid, field_mapping
+                        collection_alias, cdm_recid, current_mapping
                     )
 
                     # Save the compound file metadata in a separate JSON file.

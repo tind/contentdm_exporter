@@ -33,13 +33,11 @@ from pathlib import Path
 
 from logger import setup_logger
 
-from settings import (
-    CDM_SERVER_NUMBER,
-    REL_PATH
+from settings import CDM_SERVER_NUMBER, REL_PATH
+
+FILE_URL = "https://cdm{}.contentdm.oclc.org/utils/getfile/collection/".format(
+    CDM_SERVER_NUMBER
 )
-
-
-FILE_URL = 'https://cdm{}.contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
 
 # Path to the folder where you'll find the input xml file(s) that was downloaded with contentdm_record_exporter.
 INPUT_FOLDER = REL_PATH + "collections/"
@@ -200,21 +198,31 @@ if __name__ == "__main__":
                                                 )
                                             all_files_in_record.append(filename)
                                             files_to_download.append(
-                                                (alias, page_id, output_path, filename, logger)
+                                                (
+                                                    alias,
+                                                    page_id,
+                                                    output_path,
+                                                    filename,
+                                                    logger,
+                                                )
                                             )
 
                 if download_pdf:
                     # use the parent dmrecord to get the full pdf
                     filename = "{:06}_{:06}{}".format(int(dmrecord), 1, ".pdf")
 
-                    files_to_download.append((alias, dmrecord, output_path, filename, logger))
+                    files_to_download.append(
+                        (alias, dmrecord, output_path, filename, logger)
+                    )
 
             else:
                 # This is a single item
                 find = record.xpath("find")
                 if find:
                     filename = find[0].text
-                    files_to_download.append((alias, dmrecord, output_path, filename, logger))
+                    files_to_download.append(
+                        (alias, dmrecord, output_path, filename, logger)
+                    )
 
         if files_to_download:
 
