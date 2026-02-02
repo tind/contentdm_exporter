@@ -33,15 +33,13 @@ from pathlib import Path
 
 from logger import setup_logger
 
-from contentdm_exporter.settings import (
+from settings import (
     CDM_SERVER_NUMBER,
-    CDM_WEBSITE_URL,
     REL_PATH
 )
 
-FILE_URL = CDM_WEBSITE_URL + "utils/getfile/collection/"
-# The file URL can also be found on the format:
-# FILE_URL = 'https://cdm{}contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
+
+FILE_URL = 'https://cdm{}.contentdm.oclc.org/utils/getfile/collection/'.format(CDM_SERVER_NUMBER)
 
 # Path to the folder where you'll find the input xml file(s) that was downloaded with contentdm_record_exporter.
 INPUT_FOLDER = REL_PATH + "collections/"
@@ -57,7 +55,7 @@ def get_all_records_from_file(file_path):
     return collection
 
 
-def download_file(alias, page_id, output_path, filename):
+def download_file(alias, page_id, output_path, filename, logger):
     """
     Export file from CONTENTdm
     filename is the parameter in the CONTENTdm query which defines the local file
@@ -107,7 +105,7 @@ def get_page_info(elem):
 
 
 if __name__ == "__main__":
-    logger = setup_logger(str(Path(OUTPUT_FOLDER, "file_export.log")), "file_export")
+    setup_logger(str(Path(OUTPUT_FOLDER, "file_export.log")), "file_export")
     logger = logging.getLogger("file_export")
     # Loop through all files in path, except DS_Store (MacOS specific files).
     input_path = Path(INPUT_FOLDER)
@@ -118,8 +116,9 @@ if __name__ == "__main__":
         files_to_download = []
         for record in collection:
             all_files_in_record = []
-            # Decide about local path to download files
-            dmrecord = record.xpath("dmrecord")[0].text  # We could also have used cdmid
+            # Use cdmid rather than dmrecord - in cases where you get a "requested item not found" error message,
+            # there will still be a cdmid, but no dmrecord
+            dmrecord = record.xpath("cdmid")[0].text
 
             alias = record.xpath("cdmalias")[0].text
 
@@ -161,7 +160,7 @@ if __name__ == "__main__":
                                 )
                             all_files_in_record.append(filename)
                             files_to_download.append(
-                                (alias, page_id, output_path, filename)
+                                (alias, page_id, output_path, filename, logger)
                             )
 
                     elif elem.tag == "node":
@@ -180,7 +179,7 @@ if __name__ == "__main__":
                                         )
                                     all_files_in_record.append(filename)
                                     files_to_download.append(
-                                        (alias, page_id, output_path, filename)
+                                        (alias, page_id, output_path, filename, logger)
                                     )
 
                             elif sub_elem.tag == "node":
@@ -201,20 +200,21 @@ if __name__ == "__main__":
                                                 )
                                             all_files_in_record.append(filename)
                                             files_to_download.append(
-                                                (alias, page_id, output_path, filename)
+                                                (alias, page_id, output_path, filename, logger)
                                             )
 
                 if download_pdf:
                     # use the parent dmrecord to get the full pdf
                     filename = "{:06}_{:06}{}".format(int(dmrecord), 1, ".pdf")
 
-                    files_to_download.append((alias, dmrecord, output_path, filename))
+                    files_to_download.append((alias, dmrecord, output_path, filename, logger))
 
             else:
                 # This is a single item
-                filename = record.xpath("find")[0].text
-
-                files_to_download.append((alias, dmrecord, output_path, filename))
+                find = record.xpath("find")
+                if find:
+                    filename = find[0].text
+                    files_to_download.append((alias, dmrecord, output_path, filename, logger))
 
         if files_to_download:
 
