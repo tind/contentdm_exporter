@@ -26,20 +26,20 @@ the files.
 
 import logging
 import multiprocessing
-import requests
 import shutil
-from defusedxml.lxml import parse
 from pathlib import Path
+import requests
+from defusedxml.lxml import parse
 
 from logger import setup_logger
-
 from settings import CDM_SERVER_NUMBER, REL_PATH
 
-FILE_URL = "https://cdm{}.contentdm.oclc.org/utils/getfile/collection/".format(
-    CDM_SERVER_NUMBER
+FILE_URL = (
+    f"https://cdm{CDM_SERVER_NUMBER}.contentdm.oclc.org/utils/getfile/collection/"
 )
 
-# Path to the folder where you'll find the input xml file(s) that was downloaded with contentdm_record_exporter.
+# Path to the folder where you'll find the input xml file(s) that was downloaded with
+# contentdm_record_exporter.
 INPUT_FOLDER = REL_PATH + "collections/"
 
 # Path to the output folder where the downloaded files will be stored.
@@ -75,12 +75,14 @@ def download_file(alias, page_id, output_path, filename, logger):
                 return True
             else:
                 logger.warning(
-                    "Download failed for the URL: %s. Status Code: %s. Message: %s"
-                    % (download_url, file_response.status_code, file_response.text)
+                    "Download failed for the URL: %s. Status Code: %s. Message: %s",
+                    download_url,
+                    file_response.status_code,
+                    file_response.text,
                 )
         except requests.exceptions.Timeout as e:
             logger.warning(
-                "Download failed for the URL: %s. Error: %s" % (download_url, e)
+                "Download failed for the URL: %s. Error: %s", download_url, e
             )
             return e
     else:
@@ -114,8 +116,8 @@ if __name__ == "__main__":
         files_to_download = []
         for record in collection:
             all_files_in_record = []
-            # Use cdmid rather than dmrecord - in cases where you get a "requested item not found" error message,
-            # there will still be a cdmid, but no dmrecord
+            # Use cdmid rather than dmrecord - in cases where you get a "requested item not found"
+            # error message, there will still be a cdmid but no dmrecord
             dmrecord = record.xpath("cdmid")[0].text
 
             alias = record.xpath("cdmalias")[0].text
@@ -153,8 +155,9 @@ if __name__ == "__main__":
                             filename = str(pathinfo.name)
                             if filename in all_files_in_record:
                                 logger.warning(
-                                    "Record %s - The file name is duplicate! File name: %s"
-                                    % (dmrecord, filename)
+                                    "Record %s - The file name is duplicate! File name: %s",
+                                    dmrecord,
+                                    filename,
                                 )
                             all_files_in_record.append(filename)
                             files_to_download.append(
@@ -172,8 +175,9 @@ if __name__ == "__main__":
                                     filename = str(pathinfo.name)
                                     if filename in all_files_in_record:
                                         logger.warning(
-                                            "Record %s - The file name is duplicate! File name: %s"
-                                            % (dmrecord, filename)
+                                            "Record %s - The file name is duplicate! File name: %s",
+                                            dmrecord,
+                                            filename,
                                         )
                                     all_files_in_record.append(filename)
                                     files_to_download.append(
@@ -193,8 +197,9 @@ if __name__ == "__main__":
                                             filename = str(pathinfo.name)
                                             if filename in all_files_in_record:
                                                 logger.warning(
-                                                    "Record %s - The file name is duplicate! File name: %s"
-                                                    % (dmrecord, filename)
+                                                    "Record %s - The file name is duplicate! File name: %s",
+                                                    dmrecord,
+                                                    filename,
                                                 )
                                             all_files_in_record.append(filename)
                                             files_to_download.append(

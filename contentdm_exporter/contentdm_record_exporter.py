@@ -27,13 +27,12 @@ compound object metadata and (optional) bibliographic metadata stored on the fil
 import json
 import logging
 import math
-import requests
 import urllib.parse
+from pathlib import Path
+import requests
 from defusedxml.lxml import tostring, fromstring
 from lxml.builder import E
-from pathlib import Path
 from logger import setup_logger
-
 
 from settings import (
     CDM_SERVER_NUMBER,
@@ -50,8 +49,8 @@ from settings import (
 
 # Other variables used by the script.
 # URL to the CONTENTdm web services API.
-MAIN_URL = "https://server{}.contentdm.oclc.org/dmwebservices/index.php?q=".format(
-    CDM_SERVER_NUMBER
+MAIN_URL = (
+    f"https://server{CDM_SERVER_NUMBER}.contentdm.oclc.org/dmwebservices/index.php?q="
 )
 
 # Path to the output folder where you'll find the final xml file
@@ -84,9 +83,7 @@ def get_list_of_collection_aliases():
     """
 
     # GET collections
-    query_url_collections = "{main_url}dmGetCollectionList/json".format(
-        main_url=MAIN_URL
-    )
+    query_url_collections = f"{MAIN_URL}dmGetCollectionList/json"
 
     # Query CONTENTdm and return records; if failure, log problem.
     try:
@@ -94,11 +91,9 @@ def get_list_of_collection_aliases():
         items = res.json()
     except Exception as e:
         logger.warning(
-            "The following API request failed: %s. Error: %s"
-            % (query_url_collections, e)
+            "The following API request failed: %s. Error: %s", query_url_collections, e
         )
         items = []
-        pass
 
     # Create a list of aliases. Remove first letter which is a slash.
     return sorted([collection.get("alias")[1:] for collection in items])
@@ -111,18 +106,15 @@ def create_current_mapping_table(collection_aliases):
 
     for alias in collection_aliases:
 
-        query_url = "{main_url}dmGetCollectionFieldInfo/{alias}/{format}".format(
-            main_url=MAIN_URL, alias=alias, format="json"
-        )
+        query_url = f"{MAIN_URL}dmGetCollectionFieldInfo/{alias}/json"
 
         # Query CONTENTdm and return records; if failure, log problem.
         try:
             req = requests.get(query_url)
             fields = json.loads(req.content)
-        except Exception as E:
-            logger.warning("Failed to get fields for alias %s: %s" % (alias, E))
+        except Exception as e:
+            logger.warning("Failed to get fields for alias %s: %s", alias, e)
             fields = {}
-            pass
 
         aliases_fields[alias] = fields
 
@@ -134,7 +126,7 @@ def create_current_mapping_table(collection_aliases):
             alias_mapping[field.get("nick")] = field.get("name")
         current_mapping[alias] = alias_mapping
 
-    with open(f"{REL_PATH}/field_mapping.json", "w") as f:
+    with open(f"{REL_PATH}/field_mapping.json", "w", encoding="utf-8") as f:
         json.dump(current_mapping, f)
 
     return current_mapping
@@ -160,7 +152,7 @@ def query_contentdm(query_map):
         sortby=query_map["sortby"],
         maxrecs=query_map["maxrecs"],
         start_at=query_map["start_at"],
-        supress=query_map["supress"],
+        suppress=query_map["suppress"],
         docptr=query_map["docptr"],
         suggest=query_map["suggest"],
         facets=query_map["facets"],
@@ -172,11 +164,8 @@ def query_contentdm(query_map):
         req = requests.get(query_url)
         items = req.json()
     except Exception as e:
-        logger.warning(
-            "The following API request failed: %s. Error: %s" % (query_url, e)
-        )
+        logger.warning("The following API request failed: %s. Error: %s", query_url, e)
         items = []
-        pass
 
     return items
 
@@ -197,9 +186,7 @@ def get_collection_sources(alias):
     #     alias=alias)
     # The previous method did not work well. We will try using the source facet directly.
     query_url = (
-        "{main_url}digital/api/facet/facetfield/source/collection/{alias}".format(
-            main_url=CDM_WEBSITE_URL, alias=alias
-        )
+        f"{CDM_WEBSITE_URL}digital/api/facet/facetfield/source/collection/{alias}"
     )
 
     # Query CONTENTdm and return records; if failure, log problem.
@@ -207,11 +194,8 @@ def get_collection_sources(alias):
         req = requests.get(query_url)
         facet_fields = req.json()
     except Exception as e:
-        logger.warning(
-            "The following API request failed: %s. Error: %s" % (query_url, e)
-        )
+        logger.warning("The following API request failed: %s. Error: %s", query_url, e)
         facet_fields = {}
-        pass
 
     sources = facet_fields.get("facets", {}).get("source", [])
 
@@ -289,7 +273,8 @@ def get_file_level_id(elem):
 
     if file_level_id is None:
         logger.warning(
-            "Compound object has no file level ID (pageptr): %s" % (tostring(elem),)
+            "Compound object has no file level ID (pageptr): %s",
+            tostring(elem),
         )
 
     return file_level_id
@@ -441,7 +426,8 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
                                         sub_sub_elem.append(pagemetadata_xml)
 
                                     if EXPORT_PAGE_METADATA_JSON:
-                                        # Get the page/file_metadata in JSON and export to a separate file
+                                        # Get the page/file_metadata in JSON and export to a
+                                        # separate file
                                         pagemetadata_json = get_file_metadata_json(
                                             file_level_id, collection_alias
                                         )
@@ -498,7 +484,11 @@ def run_export_list_of_records():
     save_output_xml_to_file(collection, "multiple", 1, 1)
 
     if EXPORT_PAGE_METADATA_JSON:
-        with open(str(Path(OUTPUT_FOLDER, "compound_file_metadata.json")), "w") as f:
+        with open(
+            str(Path(OUTPUT_FOLDER, "compound_file_metadata.json")),
+            "w",
+            encoding="utf-8",
+        ) as f:
             f.write(json.dumps(compound_file_metadata))
 
 
@@ -510,21 +500,17 @@ def run_batch():
     else:
         # Get the list of collections by their aliases.
         collection_aliases = get_list_of_collection_aliases()
-    # collection_aliases = ['p17218coll2',
-    #                       'p17218coll3',
-    #                       'p17218coll4',
-    #                       'p17218coll5',
-    #                       'p17218coll7',
-    #                       'p17218coll8',
-    #                       'p17218coll9']
 
-    logger.info("The following collections were found: %s" % (collection_aliases,))
+    logger.info(
+        "The following collections were found: %s",
+        collection_aliases,
+    )
 
     field_mapping = create_current_mapping_table(collection_aliases)
 
     for alias in collection_aliases:
 
-        print("Processing the collection: %s" % (alias,))
+        print(f"Processing the collection: {alias}")
 
         collection_cdm_recids = (
             []
@@ -538,7 +524,7 @@ def run_batch():
             "sortby": "dmcreated!dmrecord",
             "maxrecs": CHUNK_SIZE,
             "start_at": 1,
-            "supress": 1,
+            "suppress": 1,
             "docptr": 0,
             "suggest": 0,
             "facets": 0,
@@ -547,8 +533,9 @@ def run_batch():
         nb_records_in_collection = get_number_of_records_in_collection(query_map)
 
         logger.info(
-            "Total number of records in collection: %s is %s"
-            % (alias, nb_records_in_collection)
+            "Total number of records in collection: %s is %s",
+            alias,
+            nb_records_in_collection,
         )
 
         # Go to the next collection if there are no records.
@@ -583,7 +570,7 @@ def run_batch():
                     "sortby": "dmcreated",  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2. Only dmrecord works too!
                     "maxrecs": CHUNK_SIZE,
                     "start_at": 1,
-                    "supress": 1,
+                    "suppress": 1,
                     "docptr": 0,
                     "suggest": 0,
                     "facets": 0,
@@ -601,20 +588,27 @@ def run_batch():
 
                 if source_count != nb_records_in_source:
                     logger.warning(
-                        "The number of records queried on the collection %s and source %s does not match the number from the facet. %s vs. %s"
-                        % (alias, source_title, nb_records_in_source, source_count)
+                        "The number of records queried on the collection %s and source %s does not match the number from the facet. %s vs. %s",
+                        alias,
+                        source_title,
+                        nb_records_in_source,
+                        source_count,
                     )
 
             if nb_records_in_collection != total_count:
                 logger.warning(
-                    "The number of records the collection %s does not match the total count from source: %s vs. %s"
-                    % (alias, nb_records_in_collection, total_count)
+                    "The number of records the collection %s does not match the total count from source: %s vs. %s",
+                    alias,
+                    nb_records_in_collection,
+                    total_count,
                 )
 
             if nb_records_in_collection != total_number_in_sources:
                 logger.warning(
-                    "The number of records the collection %s does not match the total number of records in the sources. %s vs. %s"
-                    % (alias, nb_records_in_collection, total_number_in_sources)
+                    "The number of records the collection %s does not match the total number of records in the sources. %s vs. %s",
+                    alias,
+                    nb_records_in_collection,
+                    total_number_in_sources,
                 )
         else:
             source_infos = [
@@ -623,7 +617,7 @@ def run_batch():
 
         for i, source_info in enumerate(source_infos):
             if source_info.get("source_title"):
-                print("Processing the source: %s" % (source_info.get("source_title"),))
+                print(f"Processing the source: {source_info.get('source_title')}")
 
             # We add one chunk, then round down.
             num_chunks = source_info.get("source_count") / CHUNK_SIZE + 1
@@ -656,7 +650,7 @@ def run_batch():
                     "sortby": "dmcreated",  # Of some reason, it returned zero if this was dmcreated!dmrecord for p17218coll2. Only dmrecord works too!
                     "maxrecs": CHUNK_SIZE,
                     "start_at": start_at,
-                    "supress": 1,
+                    "suppress": 1,
                     "docptr": 0,
                     "suggest": 0,
                     "facets": 0,
@@ -667,8 +661,8 @@ def run_batch():
                 results = query_contentdm(query_map)
                 if not results:
                     logger.warning(
-                        "No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s"
-                        % (start_at,)
+                        "No records was found. Could not connect to CONTENTdm to start retrieving chunk starting at: %s",
+                        start_at,
                     )
                     continue
 
@@ -676,7 +670,7 @@ def run_batch():
                 # It is because the pagination API is not stable enough, so that it has sometimes got fewer records in the result when paginating.
                 # This results in the same records being exported twice.
                 # For debugging purposes, we will add the query URL to the results export.
-                query_url = "{main_url}dmQuery/{alias}/{searchstrings}/{fields}/{sortby}/{maxrecs}/{start_at}/{docptr}/{suggest}/{facets}/{format}".format(
+                query_url = "{main_url}dmQuery/{alias}/{searchstrings}/{fields}/{sortby}/{maxrecs}/{start_at}/{suppress}/{docptr}/{suggest}/{facets}/{format}".format(
                     main_url=MAIN_URL,
                     alias=query_map["alias"],
                     searchstrings=query_map["searchstrings"],
@@ -684,7 +678,7 @@ def run_batch():
                     sortby=query_map["sortby"],
                     maxrecs=query_map["maxrecs"],
                     start_at=query_map["start_at"],
-                    supress=query_map["supress"],
+                    suppress=query_map["suppress"],
                     docptr=query_map["docptr"],
                     suggest=query_map["suggest"],
                     facets=query_map["facets"],
@@ -704,6 +698,7 @@ def run_batch():
                         )
                     ),
                     "w",
+                    encoding="utf-8",
                 ) as f:
                     f.write(json.dumps(results))
 
@@ -717,8 +712,9 @@ def run_batch():
 
                     if results_record["parentobject"] != -1:
                         logger.warning(
-                            "The parentobject for cdmid %s is not -1: %s"
-                            % (cdm_recid, results_record["parentobject"])
+                            "The parentobject for cdmid %s is not -1: %s",
+                            cdm_recid,
+                            results_record["parentobject"],
                         )
 
                     collection_alias = results_record["collection"]
@@ -730,8 +726,9 @@ def run_batch():
                     # we want to make sure that a record is not exported multiple times.
                     if cdm_recid in collection_cdm_recids:
                         logger.warning(
-                            "The record %s is expported in %s. Duplicate!"
-                            % (cdm_recid, alias)
+                            "The record %s is expported in %s. Duplicate!",
+                            cdm_recid,
+                            alias,
                         )
                     collection_cdm_recids.append(cdm_recid)
 
@@ -768,17 +765,18 @@ def run_batch():
                 str(
                     Path(
                         compound_metadata_files_path,
-                        "compound_file_metadata_{}.json".format(alias),
+                        f"compound_file_metadata_{alias}.json",
                     )
                 ),
                 "w",
+                encoding="utf-8",
             ) as f:
                 f.write(json.dumps(compound_file_metadata))
 
 
 if __name__ == "__main__":
     # Create output folder if it does not exists.
-    logger = setup_logger(
+    setup_logger(
         str(Path(OUTPUT_FOLDER, "record_export.log")), "record_export"
     )
     logger = logging.getLogger("record_export")
