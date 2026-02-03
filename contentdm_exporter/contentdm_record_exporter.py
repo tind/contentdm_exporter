@@ -343,7 +343,10 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     field_mapping_alias = field_mapping.get(collection_alias, {})
 
     # Append each field to the new record object.
-    bib_xml = fromstring(bib_info)
+    try:
+        bib_xml = fromstring(bib_info)
+    except Exception:
+        bib_xml = fromstring(bib_info.encode("utf-8"))
     for field in bib_xml:
         field_name = field_mapping_alias.get(field.tag)
         if field_name:
