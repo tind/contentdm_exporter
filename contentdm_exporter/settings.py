@@ -18,6 +18,9 @@ REL_PATH = "/Users/amyruskin/Data/vmi/migration/01_bibs/input/"
 # Used mainly for testing purposes. Example: ALIAS = "p17218coll3"
 ALIAS = ""
 
+# Provide list of collection aliases if you want to export some but not all collections
+ALIAS_LIST = []
+
 # Use the config below if you want to export particular records from different collections.
 # The format is a list of tuples with collection name and record IDs.
 # Example: [('p15999coll1', '8'), ('yellowstone', '2')]

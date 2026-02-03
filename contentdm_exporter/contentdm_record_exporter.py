@@ -39,6 +39,7 @@ from settings import (
     CDM_WEBSITE_URL,
     REL_PATH,
     ALIAS,
+    ALIAS_LIST,
     MANUAL_EXPORT_LIST,
     CHUNK_SIZE,
     START_AT,
@@ -497,6 +498,8 @@ def run_batch():
 
     if ALIAS:
         collection_aliases = [ALIAS]
+    elif len(ALIAS_LIST) > 0:
+        collection_aliases = ALIAS_LIST
     else:
         # Get the list of collections by their aliases.
         collection_aliases = get_list_of_collection_aliases()
