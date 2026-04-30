@@ -2,9 +2,9 @@
 
 1. Install the required packages from the requirement.txt file.
 
-2. Update the parameters "ALIAS" and "FILE_URL" to point to the correct CONTENTdm collection and the correct server.
+2. Create a copy of `contendm_exporter/settings_template.py` and save it as `contendm_exporter/settings.py`
 
-3. Update the parameter "REL_PATH" to specify the local path to save the output.
+3. Fill in the values of the variables in `contendm_exporter/settings.py`. For example, "ALIAS" and "FILE_URL" should point to the correct CONTENTdm collection and the correct server, and "REL_PATH" to specify the local path to save the output.
 
 4. Run `python contentdm_exporter/contentdm_record_exporter.py` to export the records from CONTENTdm.
 
