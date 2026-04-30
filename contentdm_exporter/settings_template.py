@@ -61,3 +61,7 @@ EXPORT_PAGE_METADATA = True
 # This will be in addition to exporting the page metadata in XML.
 # EXPORT_PAGE_METADATA need to be set to 'True' to be able to export page metadata at all.
 EXPORT_PAGE_METADATA_JSON = False
+
+# Do we want to export fulltext/transcription fields as separate text files?
+# If set to false, fulltext/transcription fields will be part of XML metadata
+EXPORT_FULLTEXT_FILES = True

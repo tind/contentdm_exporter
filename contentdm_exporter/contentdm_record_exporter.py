@@ -27,6 +27,7 @@ compound object metadata and (optional) bibliographic metadata stored on the fil
 import json
 import logging
 import math
+import os
 import urllib.parse
 from pathlib import Path
 import requests
@@ -46,6 +47,7 @@ from settings import (
     LAST_REC,
     EXPORT_PAGE_METADATA,
     EXPORT_PAGE_METADATA_JSON,
+    EXPORT_FULLTEXT_FILES,
 )
 
 # Other variables used by the script.
@@ -74,6 +76,9 @@ compound_metadata_files_path = Path(output_path, "compound_metadata_files")
 if not compound_metadata_files_path.is_dir():
     compound_metadata_files_path.mkdir()
 
+text_files_path = Path(output_path, "fulltext")
+if not text_files_path.is_dir():
+    text_files_path.mkdir()
 
 rec_num = 0  # Record counter
 
@@ -100,7 +105,7 @@ def get_list_of_collection_aliases():
     return sorted([collection.get("alias")[1:] for collection in items])
 
 
-# Copied over from migration_formatter/vendord_da/content_dm/file_utils_content_dm.py
+# Copied over from migration_formatter/vendor_da/content_dm/file_utils_content_dm.py
 # Creates mapping table of element tags to labels by collection
 def create_current_mapping_table(collection_aliases):
     aliases_fields = {}
@@ -283,8 +288,10 @@ def get_file_level_id(elem):
 
 def get_file_metadata_xml(file_level_id, collection_alias, field_mapping=None):
     pagemetadata = E.pagemetadata()
+    fulltext_records = []
+
     if file_level_id is None:
-        return pagemetadata
+        return pagemetadata, fulltext_records
 
     if field_mapping is None:
         field_mapping = {}
@@ -293,17 +300,25 @@ def get_file_metadata_xml(file_level_id, collection_alias, field_mapping=None):
     # Add file metadata inside the compound object.
     # Use file_level_id (pageptr)) as the key.
     file_level_info = get_item_info(collection_alias, file_level_id, format="xml")
-    file_level_xml = fromstring(file_level_info)
+    
+    try:
+        file_level_xml = fromstring(file_level_info)
+    except Exception:
+        file_level_xml = fromstring(file_level_info.encode("utf-8"))
     # Strip away empty fields.
-    pagemetadata = E.pagemetadata()
     for field in file_level_xml:
         if field.text or len(field) > 0:
+            if EXPORT_FULLTEXT_FILES and field.tag == "full" and field.text:
+                fulltext_record = {"cdmalias": collection_alias, "cdmid": file_level_id, "full": field.text}
+                fulltext_records.append(fulltext_record)
+                field.text = "[FULL TEXT OMITTED]"
             field_name = field_mapping_alias.get(field.tag)
             if field_name:
                 field.set("label", field_name)
             pagemetadata.append(field)
 
-    return pagemetadata
+
+    return pagemetadata, fulltext_records
 
 
 def get_file_metadata_json(file_level_id, collection_alias):
@@ -324,6 +339,7 @@ def get_file_metadata_json(file_level_id, collection_alias):
 def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     # Create a new xml record object.
     record = E.record()
+    fulltext_records = []
 
     record_compound_file_metadata = {}
 
@@ -348,6 +364,10 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     except Exception:
         bib_xml = fromstring(bib_info.encode("utf-8"))
     for field in bib_xml:
+        if EXPORT_FULLTEXT_FILES and field.tag == "full" and field.text:
+            fulltext_record = {"cdmalias": collection_alias, "cdmid": cdmid, "full": field.text}
+            fulltext_records.append(fulltext_record)
+            field.text = "[FULL TEXT OMITTED]"
         field_name = field_mapping_alias.get(field.tag)
         if field_name:
             field.set("label", field_name)
@@ -377,12 +397,13 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
                     # Get the file level id
                     file_level_id = get_file_level_id(elem)
                     # Get the page/file metadata
-                    pagemetadata_xml = get_file_metadata_xml(
+                    pagemetadata_xml, file_fulltext_records = get_file_metadata_xml(
                         file_level_id, collection_alias, field_mapping
                     )
                     if len(pagemetadata_xml) > 0:
                         # Append the page metadata to the page element.
                         elem.append(pagemetadata_xml)
+                        fulltext_records += file_fulltext_records
 
                     if EXPORT_PAGE_METADATA_JSON:
                         # Get the page/file_metadata in JSON and export to a separate file
@@ -400,12 +421,13 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
                             # Get the file level id
                             file_level_id = get_file_level_id(sub_elem)
                             # Get the page/file metadata
-                            pagemetadata_xml = get_file_metadata_xml(
+                            pagemetadata_xml, file_fulltext_records = get_file_metadata_xml(
                                 file_level_id, collection_alias, field_mapping
                             )
                             if len(pagemetadata_xml) > 0:
                                 # Append the page metadata to the page element.
                                 sub_elem.append(pagemetadata_xml)
+                                fulltext_records += file_fulltext_records
 
                             if EXPORT_PAGE_METADATA_JSON:
                                 # Get the page/file_metadata in JSON and export to a separate file
@@ -422,12 +444,13 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
                                     # Get the file level id
                                     file_level_id = get_file_level_id(sub_sub_elem)
                                     # Get the page/file metadata
-                                    pagemetadata_xml = get_file_metadata_xml(
+                                    pagemetadata_xml, file_fulltext_records = get_file_metadata_xml(
                                         file_level_id, collection_alias, field_mapping
                                     )
                                     if len(pagemetadata_xml) > 0:
                                         # Append the page metadata to the page element.
                                         sub_sub_elem.append(pagemetadata_xml)
+                                        fulltext_records += file_fulltext_records
 
                                     if EXPORT_PAGE_METADATA_JSON:
                                         # Get the page/file_metadata in JSON and export to a
@@ -442,7 +465,7 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
         # Append the compound object to the record
         record.append(compound_xml)
 
-    return record, record_compound_file_metadata
+    return record, record_compound_file_metadata, fulltext_records
 
 
 def save_output_xml_to_file(collection, alias, source_nb, processed_chunks):
@@ -476,7 +499,7 @@ def run_export_list_of_records():
         print("Processing ", cdm_recid)
 
         # Create the bib record with the contentDM record structure.
-        record, record_compound_file_metadata = get_bib_record(
+        record, record_compound_file_metadata, fulltext_records = get_bib_record(
             collection_alias, cdm_recid
         )
 
@@ -494,6 +517,28 @@ def run_export_list_of_records():
             encoding="utf-8",
         ) as f:
             f.write(json.dumps(compound_file_metadata))
+    
+    if EXPORT_FULLTEXT_FILES:
+        for record in fulltext_records:
+            cdmalias = record["cdmalias"]
+            cdmid = record["cdmid"]
+            ft_coll_output_path = Path(text_files_path, cdmalias)
+            if not ft_coll_output_path.is_dir():
+                ft_coll_output_path.mkdir()
+
+            ft_rec_output_path = Path(ft_coll_output_path, cdmid)
+            if not ft_rec_output_path:
+                ft_rec_output_path.mkdir()
+            
+            with open(
+                os.path.join(
+                    ft_rec_output_path, f"{cdmalias}_{cdmid}.txt"
+                ),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                for val in record["full"]:
+                    f.write(val)
 
 
 def run_batch():
@@ -739,7 +784,7 @@ def run_batch():
                     collection_cdm_recids.append(cdm_recid)
 
                     # Create the bib record with the contentDM record structure.
-                    record, record_compound_file_metadata = get_bib_record(
+                    record, record_compound_file_metadata, fulltext_records = get_bib_record(
                         collection_alias, cdm_recid, field_mapping
                     )
 
@@ -779,6 +824,27 @@ def run_batch():
             ) as f:
                 f.write(json.dumps(compound_file_metadata))
 
+        if EXPORT_FULLTEXT_FILES:
+            for record in fulltext_records:
+                cdmalias = record["cdmalias"]
+                cdmid = record["cdmid"]
+                ft_coll_output_path = Path(text_files_path, cdmalias)
+                if not ft_coll_output_path.is_dir():
+                    ft_coll_output_path.mkdir()
+
+                ft_rec_output_path = Path(ft_coll_output_path, cdmid)
+                if not ft_rec_output_path:
+                    ft_rec_output_path.mkdir()
+                
+                with open(
+                    os.path.join(
+                        ft_rec_output_path, f"{cdmalias}_{cdmid}.txt"
+                    ),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    for val in record["full"]:
+                        f.write(val)
 
 if __name__ == "__main__":
     # Create output folder if it does not exists.
