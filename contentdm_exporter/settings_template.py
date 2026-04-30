@@ -1,7 +1,7 @@
 """
 Template for script containing settings specific to CDM instance and run,
 pulled in by file and record exporter scripts. Copy this to settings.py and
-fill in values. 
+fill in values.
 """
 
 # You can use the following URL to find the server number:

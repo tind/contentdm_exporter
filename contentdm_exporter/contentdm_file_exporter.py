@@ -214,7 +214,7 @@ if __name__ == "__main__":
 
                 if download_pdf:
                     # use the parent dmrecord to get the full pdf
-                    filename = "{:06}_{:06}{}".format(int(dmrecord), 1, ".pdf")
+                    filename = f"{int(dmrecord)}_000001.pdf"
 
                     files_to_download.append(
                         (alias, dmrecord, output_path, filename, logger)

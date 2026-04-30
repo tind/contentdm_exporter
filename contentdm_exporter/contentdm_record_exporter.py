@@ -782,9 +782,7 @@ def run_batch():
 
 if __name__ == "__main__":
     # Create output folder if it does not exists.
-    setup_logger(
-        str(Path(OUTPUT_FOLDER, "record_export.log")), "record_export"
-    )
+    setup_logger(str(Path(OUTPUT_FOLDER, "record_export.log")), "record_export")
     logger = logging.getLogger("record_export")
     run_batch()
 

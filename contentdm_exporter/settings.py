@@ -38,6 +38,7 @@ ALIAS_LIST = []
 #     ('p15999coll24', '9632'),
 #     ('WomansExp', '2399')
 # ]
+MANUAL_EXPORT_LIST = []
 
 #  Don't change CHUNK_SIZE unless CONTENTdm is timing out.
 CHUNK_SIZE = 100
