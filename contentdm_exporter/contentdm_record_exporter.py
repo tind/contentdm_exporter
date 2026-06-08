@@ -48,6 +48,7 @@ from settings import (
     EXPORT_PAGE_METADATA,
     EXPORT_PAGE_METADATA_JSON,
     EXPORT_FULLTEXT_FILES,
+    OMIT_FULLTEXT_FIELD
 )
 
 # Other variables used by the script.
@@ -308,9 +309,10 @@ def get_file_metadata_xml(file_level_id, collection_alias, field_mapping=None):
     # Strip away empty fields.
     for field in file_level_xml:
         if field.text or len(field) > 0:
-            if EXPORT_FULLTEXT_FILES and field.tag == "full" and field.text:
-                fulltext_record = {"cdmalias": collection_alias, "cdmid": file_level_id, "full": field.text}
-                fulltext_records.append(fulltext_record)
+            if OMIT_FULLTEXT_FIELD and field.tag == "full" and field.text:
+                if EXPORT_FULLTEXT_FILES:
+                    fulltext_record = {"cdmalias": collection_alias, "cdmid": file_level_id, "full": field.text}
+                    fulltext_records.append(fulltext_record)
                 field.text = "[FULL TEXT OMITTED]"
             field_name = field_mapping_alias.get(field.tag)
             if field_name:
@@ -364,9 +366,10 @@ def get_bib_record(collection_alias, cdm_recid, field_mapping=None):
     except Exception:
         bib_xml = fromstring(bib_info.encode("utf-8"))
     for field in bib_xml:
-        if EXPORT_FULLTEXT_FILES and field.tag == "full" and field.text:
-            fulltext_record = {"cdmalias": collection_alias, "cdmid": cdmid, "full": field.text}
-            fulltext_records.append(fulltext_record)
+        if OMIT_FULLTEXT_FIELD and field.tag == "full" and field.text:
+            if EXPORT_FULLTEXT_FILES:
+                fulltext_record = {"cdmalias": collection_alias, "cdmid": cdmid, "full": field.text}
+                fulltext_records.append(fulltext_record)
             field.text = "[FULL TEXT OMITTED]"
         field_name = field_mapping_alias.get(field.tag)
         if field_name:
@@ -527,7 +530,7 @@ def run_export_list_of_records():
                 ft_coll_output_path.mkdir()
 
             ft_rec_output_path = Path(ft_coll_output_path, cdmid)
-            if not ft_rec_output_path:
+            if not ft_rec_output_path.isdir():
                 ft_rec_output_path.mkdir()
             
             with open(
@@ -833,7 +836,7 @@ def run_batch():
                     ft_coll_output_path.mkdir()
 
                 ft_rec_output_path = Path(ft_coll_output_path, cdmid)
-                if not ft_rec_output_path:
+                if not ft_rec_output_path.is_dir():
                     ft_rec_output_path.mkdir()
                 
                 with open(
